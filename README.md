@@ -48,7 +48,7 @@ These services include APIs such as `/createEnv` to create an environment, `/obs
 
 We have implemented 14 types of environments, and **developers can easily develop new environments and add them to AgentGym by encapsulating the aforementioned interfaces**. EnvClients have the responsibility of receiving services provided by the server and encapsulating them into functions for user calls. AgentController is our core component that connects the agent and the environment. It is responsible for evaluating the agent, collecting data, and training the agent.
 
-<div align=center><img src="./assets/platform.png" width="40%" /></div>
+<div align=center><img src="./assets/platform.png" width="60%" /></div>
 
 
 
