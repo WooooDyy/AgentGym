@@ -1,0 +1,3 @@
+[submodule "agentenv-lmrlgym/lmrlgym"]
+	path = agentenv-lmrlgym/lmrlgym
+	url = https://github.com/abdulhaim/LMRL-Gym.git
