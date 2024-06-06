@@ -1,6 +1,6 @@
 # AgentGym: Evolving Large Language Model-based Agents across Diverse Environments
 <p align="center">
- 🤗 <a href="https://huggingface.co/datasets/AgentGym/AgentTraj-L" target="_blank">AgentTraj-L</a > • 🤗 <a href="https://huggingface.co/datasets/AgentGym/AgentEval" target="_blank">AgentEval</a > • 🤗 <a href="https://huggingface.co/AgentGym/AgentEvol-7B" target="_blank">Model (AgentEvol-7B)</a > • 📃 <a href="TODO" target="_blank">Paper</a > • 🌐 <a href="https://agentgym.github.io/" target="_blank">Project Page</a > <br>
+  📃 <a href="TODO" target="_blank">Paper</a > • 🌐 <a href="https://agentgym.github.io/" target="_blank">Project Page</a > • 🤗 <a href="https://huggingface.co/datasets/AgentGym/AgentTraj-L" target="_blank">AgentTraj-L</a > • 🤗 <a href="https://huggingface.co/datasets/AgentGym/AgentEval" target="_blank">AgentEval</a > • 🤗 <a href="https://huggingface.co/AgentGym/AgentEvol-7B" target="_blank">Model (AgentEvol-7B)</a ><br>
 </p >
 
 ## 🔔 News
