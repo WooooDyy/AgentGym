@@ -1,0 +1,13 @@
+*.ipynb*
+*.pyc
+*.swp
+
+.DS_Store
+.idea/
+.pytest_cache/
+.vscode/
+
+__pycache__/
+search_engine/*
+transfer/flagged
+user_session_logs/
