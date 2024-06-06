@@ -8,7 +8,7 @@
 - 🥳 [2024/06/07] Our paper is released on arXiv: [AgentGym](TODO) !
 - 🤖 [2024/06/06] Our model is available on Hugging Face: [AgentEvol-7B](https://huggingface.co/AgentGym/AgentEvol-7B).
 - 💥 [2024/06/06] Our trajectory set and benchmark are available on Hugging Face: [AgentTraj-L](https://huggingface.co/datasets/AgentGym/AgentTraj-L), [AgentEval](https://huggingface.co/datasets/AgentGym/AgentEval).
-- ✨ [2024/06/06] The AgentGym suite is released, including the platform code, dataset, benchmark, and training implementations! We Welcome contribution for more environments and models from community!
+- ✨ [2024/06/06] The AgentGym suite is released, including the platform code, dataset, benchmark, and training implementations! We Welcome contributions for more agent environments and others from the community!
 
 <div align=center><img src="./assets/evolution.png" width="90%" /></div>
 
