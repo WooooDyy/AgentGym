@@ -20,7 +20,7 @@ Building generalist agents that can handle diverse tasks and evolve themselves a
 
 <div align=center><img src="./assets/agentgym.png" width="90%" /></div>
 
-
+Welcome contribution for more environments and models!
 
 ## 🎁 AgentGym Suite
 
