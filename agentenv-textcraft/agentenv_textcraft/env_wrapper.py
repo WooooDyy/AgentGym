@@ -68,8 +68,8 @@ class TextCraft_Wrapper:
 
     def _check_id(self, id: int):
         if id not in self.info:
-            raise NameError(f"The id {id} is not valid.")
+            raise ValueError(f"The id {id} is not valid.")
         if self.info[id]["deleted"]:
-            raise NameError(f"The task with environment {id} has been deleted.")
+            raise ValueError(f"The task with environment {id} has been deleted.")
 
 server = TextCraft_Wrapper()

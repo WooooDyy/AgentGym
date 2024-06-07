@@ -6,12 +6,8 @@ from .utils import load_config, process_ob
 
 
 class ALFWorld_Wrapper:
-    def __init__(self, **kwargs):
-        # load data_path
-        self.data_path = kwargs.get("data_path", None)
-        if self.data_path is None:
-            raise Exception("missing parameter data_path")
-        os.environ["ALFWORLD_DATA"] = self.data_path
+    def __init__(self, data_path: str, **kwargs):
+        self.data_path = data_path
 
         # load config for alfworld benchmark
         self.config_path = kwargs.get("config_path", None)
@@ -26,10 +22,10 @@ class ALFWorld_Wrapper:
         self.games = []  # list[game_file]
         
         train_games_root = os.path.join(
-            os.environ["ALFWORLD_DATA"], "json_2.1.1", "train"
+            self.data_path, "json_2.1.1", "train"
         )
         test_games_root = os.path.join(
-            os.environ["ALFWORLD_DATA"], "json_2.1.1", "valid_train"
+            self.data_path, "json_2.1.1", "valid_train"
         )
 
         train_mapping_file = os.path.join(
@@ -153,13 +149,13 @@ class ALFWorld_Wrapper:
 
     def _check_id(self, idx: int, is_reset: bool = False):
         if idx not in self.info:
-            raise NameError(f"The id {idx} is not valid.")
+            raise ValueError(f"The id {idx} is not valid.")
         if self.info[idx]["deleted"]:
-            raise NameError(f"The task with environment {idx} has been deleted.")
+            raise ValueError(f"The task with environment {idx} has been deleted.")
         if not is_reset and self.info[idx]["done"]:
             print("is reset", is_reset)
             print("done", self.info[idx]["done"])
-            raise NameError(f"The task with environment {idx} has finished.")
+            raise ValueError(f"The task with environment {idx} has finished.")
 
 
 os.environ["ALFWORLD_DATA"] = os.path.expanduser("~/.cache/alfworld")

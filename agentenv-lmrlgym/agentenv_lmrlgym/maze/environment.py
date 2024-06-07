@@ -76,7 +76,7 @@ class Lmrlgym_MazeEnv:
                 (8, 6),
             ]
             if game >= len(start_positions):
-                raise NameError(f"The game {game} is not valid.")
+                raise ValueError(f"The game {game} is not valid.")
             self.env[idx], ob, init_position = setup_maze_env(
                 "double_t_maze", start_position=start_positions[game], **kwargs
             )
@@ -123,11 +123,11 @@ class Lmrlgym_MazeEnv:
 
     def _check_id(self, idx: int, is_reset: bool = False):
         if idx not in self.info:
-            raise NameError(f"The id {idx} is not valid.")
+            raise ValueError(f"The id {idx} is not valid.")
         if self.info[idx]["deleted"]:
-            raise NameError(f"The task with environment {idx} has been deleted.")
+            raise ValueError(f"The task with environment {idx} has been deleted.")
         if not is_reset and self.info[idx]["done"]:
-            raise NameError(f"The task with environment {idx} has finished.")
+            raise ValueError(f"The task with environment {idx} has finished.")
 
 
 maze_server = Lmrlgym_MazeEnv()

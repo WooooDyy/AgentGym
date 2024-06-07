@@ -45,7 +45,7 @@ class Lmrlgym_WordleEnv:
                 Text(action, True),
             )
             ob, reward, done = self.env[idx].step(history)
-            # modify score from [-1, 0] to [0, 1]
+            # modify reward from {-1, 0} to {0, 1}
             if reward <= 0:
                 reward += 1
             ob = ob[-1].text
@@ -105,11 +105,11 @@ class Lmrlgym_WordleEnv:
 
     def _check_id(self, idx: int, is_reset: bool = False):
         if idx not in self.info:
-            raise NameError(f"The id {idx} is not valid.")
+            raise ValueError(f"The id {idx} is not valid.")
         if self.info[idx]["deleted"]:
-            raise NameError(f"The task with environment {idx} has been deleted.")
+            raise ValueError(f"The task with environment {idx} has been deleted.")
         if not is_reset and self.info[idx]["done"]:
-            raise NameError(f"The task with environment {idx} has finished.")
+            raise ValueError(f"The task with environment {idx} has finished.")
 
 
 wordle_server = Lmrlgym_WordleEnv()
