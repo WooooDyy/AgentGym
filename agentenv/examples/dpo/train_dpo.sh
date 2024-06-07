@@ -1,4 +1,4 @@
-SFT_MODEL_PATH=
+BC_MODEL_PATH=
 DATASET_FILE_PATH=PATH/TO/dpo_dataset.json
 OUTPUT_PATH=
 
@@ -12,8 +12,8 @@ if [ ! -d ${OUTPUT_PATH} ]; then
 fi
 
 torchrun --nproc_per_node=8 train_dpo_multiturn.py \
-    --model_name_or_path ${SFT_MODEL_PATH} \
-    --ref_model_name_or_path ${SFT_MODEL_PATH} \
+    --model_name_or_path ${BC_MODEL_PATH} \
+    --ref_model_name_or_path ${BC_MODEL_PATH} \
     --trust_remote_code True \
     --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 4 \

@@ -10,7 +10,7 @@ from agentenv.envs import (
     WebarenaTask,
     WebshopTask,
 )
-from agentenv.trainer.sft_trainer import SFTTrainer
+from agentenv.trainer.bc_trainer import BCTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -27,7 +27,7 @@ class TrainingArguments:
         metadata={"help": "Path of initial train model"},
     )
     model_save_path: str = field(
-        default="sft_outputs/model",
+        default="outputs/model",
         metadata={"help": "Directory to save the trained model."},
     )
     task_name: str = field(
@@ -71,8 +71,8 @@ class TrainingArguments:
 
     # wandb stuff
     wandb_log: bool = field(default=False)
-    wandb_project: str = field(default="AgentGym_SFT")
-    wandb_run_name: str = field(default="sft")
+    wandb_project: str = field(default="AgentGym_behavioral_clone")
+    wandb_run_name: str = field(default="behavioral_clone")
 
     # environment parameters
     env_server_base: str = field(default=None)
@@ -111,7 +111,7 @@ def main():
         "timeout": args.timeout,
     }
 
-    trainer = SFTTrainer(
+    trainer = BCTrainer(
         Agent(model, tokenizer),
         [task_class(client_args=env_args, n_clients=1)],
         args,

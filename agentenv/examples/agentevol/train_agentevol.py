@@ -10,7 +10,7 @@ from agentenv.envs import (
     WebarenaTask,
     WebshopTask,
 )
-from agentenv.trainer.self_improve_trainer import SelfImproveTrainer
+from agentenv.trainer.agentevol_trainer import AgentEvolTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -31,7 +31,7 @@ class TrainingArguments:
         metadata={"help": "Path of initial train model"},
     )
     model_save_path: str = field(
-        default="sft_outputs/model",
+        default="outputs/model",
         metadata={"help": "Directory to save the trained model."},
     )
     task_name: str = field(default="webshop", metadata={"help": "Task name for evaluation"})
@@ -56,7 +56,7 @@ class TrainingArguments:
     seed: int = field(default=42)
     max_input_length: int = field(default=700)
 
-    # self improve
+    # agent evol
     sample_num: int = field(default=5)
     iter_num: int = field(default=0)
 
@@ -68,8 +68,8 @@ class TrainingArguments:
 
     # wandb stuff
     wandb_log: bool = field(default=False)
-    wandb_project: str = field(default="AgentGym_self_improve")
-    wandb_run_name: str = field(default="self_improve")
+    wandb_project: str = field(default="AgentGym_agent_evol")
+    wandb_run_name: str = field(default="agent_evol")
 
     # environment parameters
     env_server_base: str = field(default=None)
@@ -108,12 +108,12 @@ def main():
         "timeout": args.timeout,
     }
 
-    trainer = SelfImproveTrainer(
+    trainer = AgentEvolTrainer(
         Agent(model, tokenizer),
         [task_class(client_args=env_args, n_clients=1)],
         args,
     )
-    trainer.self_improve()
+    trainer.evol()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-exp_name="sft_sciworld_2120"
+exp_name="behavioral_clone_sciworld_2120"
 
 n_epochs='1'
 
@@ -11,7 +11,7 @@ config_file=""
 train_file='PATH/TO/sciworld_train.json'
 inference_file='PATH/TO/webshop_test.json'
 model_train_path="meta-llama/Llama-2-7b-chat-hf"
-model_save_path="sft_outputs/${exp_name}/"
+model_save_path="outputs/${exp_name}/"
 
 batch_size="2"
 eval_batch_size="1"
@@ -54,7 +54,7 @@ accelerate launch \
         --config_file "${config_file}" \
         --num_processes=${num_processes} \
         --main_process_port=${main_process_port} \
-    train_sft.py \
+    train_behavioral_clone.py \
         --train_file "${train_file}" \
         --inference_file "${test_file_list[3]}" \
         --test_file "${test_file_list[3]}" \
