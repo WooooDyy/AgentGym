@@ -1,5 +1,4 @@
 from scienceworld import ScienceWorldEnv
-import uuid
 
 
 class SciWorldEnv:

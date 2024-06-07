@@ -153,8 +153,6 @@ class ALFWorld_Wrapper:
         if self.info[idx]["deleted"]:
             raise ValueError(f"The task with environment {idx} has been deleted.")
         if not is_reset and self.info[idx]["done"]:
-            print("is reset", is_reset)
-            print("done", self.info[idx]["done"])
             raise ValueError(f"The task with environment {idx} has finished.")
 
 

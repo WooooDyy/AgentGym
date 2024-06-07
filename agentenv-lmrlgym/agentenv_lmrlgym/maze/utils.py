@@ -53,7 +53,6 @@ def setup_maze_env(
     display_position: bool = True,
     display_init_position: bool = False,
     success_reward: float = 1.0,
-    illegal_penalty: float = -4.0,
     max_steps: int = 50,
     **kwargs,
 ):
