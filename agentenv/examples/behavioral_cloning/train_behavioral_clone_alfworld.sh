@@ -1,17 +1,16 @@
-exp_name="sft_eval_alfworld_mix_24110"
+exp_name="behavioral_clone_alfworld_1000"
 
 n_epochs='1'
 
 # accelerator config
 num_processes='8'
-main_process_port='8897'
+main_process_port='8895'
 config_file=""
 
 # training arguments
-train_file='PATH/TO/mix_data_24110.json'
-inference_file='PATH/TO/webshop_test.json'
+train_file='PATH/TO/alfworld_train_1000.json'
 model_train_path="meta-llama/Llama-2-7b-chat-hf"
-model_save_path="sft_outputs/${exp_name}/"
+model_save_path="outputs/${exp_name}/"
 
 batch_size="2"
 eval_batch_size="1"
@@ -54,8 +53,10 @@ accelerate launch \
         --config_file "${config_file}" \
         --num_processes=${num_processes} \
         --main_process_port=${main_process_port} \
-    train_sft.py \
+    train_behavioral_clone.py \
         --train_file "${train_file}" \
+        --inference_file "${test_file_list[1]}" \
+        --test_file "${test_file_list[1]}" \
         --model_train_path "${model_train_path}" \
         --model_save_path "${model_save_path}" \
         --task_name "${task_list[1]}" \
@@ -81,31 +82,28 @@ accelerate launch \
         --env_server_base "${env_server_base_list[1]}" \
         --data_len "${data_len}" \
         --timeout "${timeout}"
-                
-# step2: eval on test dataset
-for index in "${!task_list[@]}";
-do
-    cur_task=${task_list[$index]}
-    cur_test_file="${test_file_list[$index]}"
-    cur_max_round=${max_round_list[$index]}
-    cur_env_server_base=${env_server_base_list[$index]}
-    cur_eval_output_file="${model_save_path}/eval_${cur_task}.jsonl"
 
-    accelerate launch \
-            --config_file "${config_file}" \
-            --num_processes=${num_processes} \
-            --main_process_port=${main_process_port} \
-        ../../utils/distributed_eval_task.py \
-            --model_path "${model_save_path}/train_epoch_${n_epochs}" \
-            --output_file "${cur_eval_output_file}" \
-            --inference_file "${cur_test_file}" \
-            --task_name "${cur_task}" \
-            --eval_batch_size "${eval_batch_size}" \
-            --num_workers "${num_workers}" \
-            --seed "${seed}" \
-            --do_sample "${do_sample}" \
-            --max_round "${cur_max_round}" \
-            --env_server_base "${cur_env_server_base}" \
-            --data_len "${data_len}" \
-            --timeout "${timeout}"
-done
+# step2: eval on test dataset
+cur_task=${task_list[1]}
+test_file=${test_file_list[1]}
+max_round=${max_round_list[1]}
+env_server_base=${env_server_base_list[1]}
+eval_output_file="${model_save_path}/eval_${cur_task}.jsonl"
+
+accelerate launch \
+        --config_file "${config_file}" \
+        --num_processes=${num_processes} \
+        --main_process_port=${main_process_port} \
+    ../../utils/distributed_eval_task.py \
+        --model_path "${model_save_path}/train_epoch_${n_epochs}" \
+        --output_file "${eval_output_file}" \
+        --inference_file "${test_file}" \
+        --task_name "${cur_task}" \
+        --eval_batch_size "${eval_batch_size}" \
+        --num_workers "${num_workers}" \
+        --seed "${seed}" \
+        --do_sample "${do_sample}" \
+        --max_round "${max_round}" \
+        --env_server_base "${env_server_base}" \
+        --data_len "${data_len}" \
+        --timeout "${timeout}"

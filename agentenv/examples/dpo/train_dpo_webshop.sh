@@ -1,4 +1,4 @@
-SFT_MODEL_PATH=
+BC_MODEL_PATH=
 DATASET_FILE_PATH=PATH/TO/Webshop_train.json
 OUTPUT_PATH=
 TESTSET_DATA_PATH=PATH/TO/Webshop_test.json
@@ -17,10 +17,10 @@ if [ ! -d ${OUTPUT_PATH} ]; then
     mkdir -p ${OUTPUT_PATH}
 fi
 
-# echo "Stage 0: evaluate the sft model"
+# echo "Stage 0: evaluate the BC model"
 # accelerate launch ../../utils/distributed_eval_task.py \
-#     --model_path ${SFT_MODEL_PATH} \
-#     --output_file ${OUTPUT_PATH}/sft_webshop_eval.jsonl \
+#     --model_path ${BC_MODEL_PATH} \
+#     --output_file ${OUTPUT_PATH}/bc_webshop_eval.jsonl \
 #     --inference_file ${TESTSET_DATA_PATH} \
 #     --task_name "webshop" \
 #     --eval_batch_size 1 \
@@ -33,7 +33,7 @@ fi
 
 echo "Stage 1: sample twice to get pair data"
 accelerate launch ../../utils/distributed_eval_task.py \
-    --model_path ${SFT_MODEL_PATH} \
+    --model_path ${BC_MODEL_PATH} \
     --output_file ${OUTPUT_PATH}/dpo_webshop_inference_a.jsonl \
     --inference_file ${DATASET_FILE_PATH} \
     --task_name "webshop" \
@@ -46,7 +46,7 @@ accelerate launch ../../utils/distributed_eval_task.py \
     --data_len 200 \
     --timeout 2400
 accelerate launch ../../utils/distributed_eval_task.py \
-    --model_path ${SFT_MODEL_PATH} \
+    --model_path ${BC_MODEL_PATH} \
     --output_file ${OUTPUT_PATH}/dpo_webshop_inference_b.jsonl \
     --inference_file ${DATASET_FILE_PATH} \
     --task_name "webshop" \
@@ -69,8 +69,8 @@ python -u make_dpo_dataset.py \
 
 echo "Stage 3: train the dpo model"
 torchrun --nproc_per_node=8 train_dpo_multiturn.py \
-    --model_name_or_path ${SFT_MODEL_PATH} \
-    --ref_model_name_or_path ${SFT_MODEL_PATH} \
+    --model_name_or_path ${BC_MODEL_PATH} \
+    --ref_model_name_or_path ${BC_MODEL_PATH} \
     --trust_remote_code True \
     --per_device_train_batch_size 2 \
     --per_device_eval_batch_size 4 \

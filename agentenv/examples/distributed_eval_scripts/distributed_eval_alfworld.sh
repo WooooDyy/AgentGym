@@ -1,4 +1,4 @@
-exp_name="self_improve"
+exp_name="eval_alfworld"
 inference_file='' # Path to the trainset file which contains idxs for the task.
 
 num_processes='8'

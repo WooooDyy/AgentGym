@@ -1,6 +1,6 @@
 numgpu=8
 
-exp_name="self_improve_webshop_500"
+exp_name="agentevol_webshop_500"
 
 n_epochs='1' 
 
@@ -14,7 +14,7 @@ iter_data_path='./iter_data/iter_data_webshop_500'
 
 # agent model
 model_train_path="meta-llama/Llama-2-7b-chat-hf"
-output_dir="sft_outputs/${exp_name}"
+output_dir="outputs/${exp_name}"
 
 batch_size="2"
 eval_batch_size="1"
@@ -68,7 +68,7 @@ do
             --config_file "${config_file}" \
             --num_processes=${num_processes} \
             --main_process_port=${main_process_port} \
-        train_self_improve.py \
+        train_agentevol.py \
                 --train_file "${iter_data_path}/train_iter_${ITER}.json" \
                 --inference_file "${test_file_list[0]}" \
                 --test_file "${test_file_list[0]}" \
@@ -157,7 +157,7 @@ do
 
     # step4: filter
     next_iter_file="${iter_data_path}/train_iter_$((ITER + 1)).json"
-    python ../../utils/self_improve_filter.py \
+    python ../../utils/agentevol_filter.py \
         --inference_output_file_path ${iter_save_path} \
         --cur_iter_file "${iter_data_path}/train_iter_${ITER}.json" \
         --next_iter_file "${next_iter_file}" \
