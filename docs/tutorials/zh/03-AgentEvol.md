@@ -8,4 +8,4 @@ AgentGYM 提出了 AgentEvol 算法，使模型能自我进化。
 
 ## 自我进化
 
-`agentenv/examples/self_improve` 给出了自我进化算法的参考实现。请参考 `examples/self_improve/train_self_improve_multi_task.sh` 启动训练。
+`agentenv/examples/agentevol` 给出了自我进化算法的参考实现。请参考 `examples/agentevol/train_agentevol_multi_task.sh` 启动训练。

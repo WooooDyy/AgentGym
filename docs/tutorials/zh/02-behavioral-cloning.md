@@ -42,7 +42,7 @@ AgentGYM 提供了各个环境的训练集/验证集 id 划分，你可以从 [H
 
 ## 训练
 
-本节介绍如何使用 `agentenv` 包的 `agentenv.trainer.sft_trainer.SFTTrainer` 进行行为克隆。请参考 `agentenv/agentenv/trainer/sft_trainer.py`
+本节介绍如何使用 `agentenv` 包的 `agentenv.trainer.bc_trainer.BCTrainer` 进行行为克隆。请参考 `agentenv/agentenv/trainer/bc_trainer.py`
 
 ```python
 from dataclasses import dataclass, field
@@ -57,7 +57,7 @@ from agentenv.envs import (
     WebarenaTask,
     WebshopTask,
 )
-from agentenv.trainer.sft_trainer import SFTTrainer
+from agentenv.trainer.bc_trainer import BCTrainer
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
@@ -74,7 +74,7 @@ class TrainingArguments:
         metadata={"help": "Path of initial train model"},
     )
     model_save_path: str = field(
-        default="sft_outputs/model",
+        default="outputs/model",
         metadata={"help": "Directory to save the trained model."},
     )
     task_name: str = field(
@@ -118,8 +118,8 @@ class TrainingArguments:
 
     # wandb stuff
     wandb_log: bool = field(default=False)
-    wandb_project: str = field(default="AgentGym_SFT")
-    wandb_run_name: str = field(default="sft")
+    wandb_project: str = field(default="AgentGym_behavioral_clone")
+    wandb_run_name: str = field(default="behavioral_clone")
 
     # environment parameters
     env_server_base: str = field(default=None)
@@ -158,7 +158,7 @@ def main():
         "timeout": args.timeout,
     }
 
-    trainer = SFTTrainer(
+    trainer = BCTrainer(
         Agent(model, tokenizer),
         [task_class(client_args=env_args, n_clients=1)],
         args,
@@ -171,10 +171,10 @@ if __name__ == "__main__":
     main()
 ```
 
-使用 accelerate 来启动训练，请参考 `agentenv/examples/behavioral_cloning/train_sft_multi_task.sh`
+使用 accelerate 来启动训练，请参考 `agentenv/examples/behavioral_cloning/train_behavioral_clone_multi_task.sh`
 
 ```bash
-exp_name="sft_eval_alfworld_mix_24110"
+exp_name="behavioral_clone_eval_alfworld_mix_24110"
 
 n_epochs='1'
 
@@ -187,7 +187,7 @@ config_file=""
 train_file='PATH/TO/mix_data_24110.json'
 inference_file='PATH/TO/webshop_test.json'
 model_train_path="meta-llama/Llama-2-7b-chat-hf"
-model_save_path="sft_outputs/${exp_name}/"
+model_save_path="outputs/${exp_name}/"
 
 batch_size="2"
 eval_batch_size="1"
@@ -230,7 +230,7 @@ accelerate launch \
         --config_file "${config_file}" \
         --num_processes=${num_processes} \
         --main_process_port=${main_process_port} \
-    train_sft.py \
+    train_behavioral_clone.py \
         --train_file "${train_file}" \
         --model_train_path "${model_train_path}" \
         --model_save_path "${model_save_path}" \

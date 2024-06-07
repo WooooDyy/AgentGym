@@ -1,3 +1,3 @@
 from .distributed_evaluator import DistributedEvaluator
-from .self_improve_trainer import SelfImproveTrainer
-from .sft_trainer import SFTTrainer
+from .agentevol_trainer import AgentEvolTrainer
+from .bc_trainer import BCTrainer
