@@ -12,9 +12,8 @@ import torch
 import wandb
 from accelerate import Accelerator, InitProcessGroupKwargs
 from accelerate.utils import broadcast, gather_object
-from agentenv.controller import Agent
 from agentenv.controller.agent import Agent
-from agentenv.controller.task import BaseTask
+from agentenv.controller.task import BaseTask, GenerationConfig
 from agentenv.controller.utils import BaseTrainer
 from agentenv.trainer.utils import set_seed
 from datasets import Dataset, DatasetDict
@@ -23,16 +22,18 @@ from tqdm import tqdm
 from transformers import AdamW, GenerationConfig, get_linear_schedule_with_warmup
 
 
-class SFTTrainer(BaseTrainer):
+class AgentEvolTrainer(BaseTrainer):
     def __init__(self, agent: Agent, tasks: Sequence[BaseTask], args) -> None:
         self.agent = agent
         self.tasks = tasks
         self.args = asdict(args)
 
         # data & loader
+        self.raw_dataset = None
         self.train_dataset = None
         self.train_dataloader = None
         self.test_dataloader = None
+        self.inference_dataloader = None
 
         # accelerator
         self.accelerator = None
@@ -61,7 +62,7 @@ class SFTTrainer(BaseTrainer):
         self.accelerator = Accelerator(
             gradient_accumulation_steps=self.args["gradient_accumulation_steps"],
             kwargs_handlers=[InitProcessGroupKwargs(timeout=timedelta(seconds=18000))],
-        )  # wait for processing upto 5hrs
+        )
 
     def set_seed(self):
         """
@@ -82,22 +83,16 @@ class SFTTrainer(BaseTrainer):
         with self.accelerator.main_process_first():
             self.raw_dataset = DatasetDict(
                 {
-                    "train": Dataset.from_list(
-                        json.load(open(self.args["train_file"], "r"))
-                    ),
-                    "inference": Dataset.from_list(
-                        json.load(open(self.args["inference_file"], "r"))
-                    ),
-                    "test": Dataset.from_list(
-                        json.load(open(self.args["test_file"], "r"))
-                    ),
+                    "train": Dataset.from_list(json.load(open(self.args["train_file"], "r"))),
+                    "inference": Dataset.from_list(json.load(open(self.args["inference_file"], "r"))),
+                    "test": Dataset.from_list(json.load(open(self.args["test_file"], "r"))),
                 }
             )
             self.accelerator.print("Raw data:", self.raw_dataset)
 
     def get_train_dataloader(self):
         """
-        create train_dataset and train_dataloader
+        create train_dataset 和 train_dataloader
         """
 
         def tokenize_fn(batch, args, tokenizer):
@@ -114,7 +109,6 @@ class SFTTrainer(BaseTrainer):
 
                 input_ids = []
                 labels = []
-
                 for message in conversations:
                     if message["from"] == "human":
                         text = f"<s>[INST] {message['value']} [/INST]"
@@ -123,7 +117,6 @@ class SFTTrainer(BaseTrainer):
                         labels.extend([-100] * len(input_encode))
                     else:
                         # message["from"] == "gpt":
-                        # text = f" {message['value']}</s>"
                         text = f" {message['value']}"
                         input_encode = tokenizer.encode(text, add_special_tokens=False)
                         input_encode += [tokenizer.eos_token_id]
@@ -180,17 +173,12 @@ class SFTTrainer(BaseTrainer):
 
             for item in batch:
                 input_ids.append(
-                    item["input_ids"]
-                    + [tokenizer.pad_token_id]
-                    * (max_input_length - len(item["input_ids"]))
+                    item["input_ids"] + [tokenizer.pad_token_id] * (max_input_length - len(item["input_ids"]))
                 )
                 attention_mask.append(
-                    item["attention_mask"]
-                    + [0] * (max_input_length - len(item["attention_mask"]))
+                    item["attention_mask"] + [0] * (max_input_length - len(item["attention_mask"]))
                 )
-                labels.append(
-                    item["labels"] + [-100] * (max_target_length - len(item["labels"]))
-                )
+                labels.append(item["labels"] + [-100] * (max_target_length - len(item["labels"])))
 
             forward_kwargs = {
                 "input_ids": torch.LongTensor(input_ids),
@@ -216,13 +204,10 @@ class SFTTrainer(BaseTrainer):
         """
 
         def collate_fn(batch):
-            result = {
-                "data_idxs": [int(item["item_id"].split("_")[-1]) for item in batch]
-            }
+            result = {"data_idxs": [int(item["item_id"].split("_")[-1]) for item in batch]}
             return result
 
         with self.accelerator.main_process_first():
-
             self.inference_dataloader = DataLoader(
                 self.raw_dataset["inference"],
                 batch_size=self.args["eval_batch_size"],
@@ -238,16 +223,13 @@ class SFTTrainer(BaseTrainer):
                 pin_memory=True,
                 collate_fn=partial(collate_fn),
             )
-            self.accelerator.print(
-                "Number of inference batches:", len(self.inference_dataloader)
-            )
+            self.accelerator.print("Number of inference batches:", len(self.inference_dataloader))
             self.accelerator.print("Number of test batches:", len(self.test_dataloader))
 
     def setup_wandb(self):
         """
         Set the wandb.
         """
-        # os.environ["WANDB_MODE"] = "offline"
         if torch.distributed.get_rank() == 0 and self.args["wandb_log"]:
             wandb.init(
                 project=self.args["wandb_project"],
@@ -283,9 +265,7 @@ class SFTTrainer(BaseTrainer):
         Prepare the model, optimizer, and dataloader.
         """
         num_training_steps = (
-            len(self.train_dataloader)
-            // self.accelerator.num_processes
-            * self.args["n_epochs"]
+            len(self.train_dataloader) // self.accelerator.num_processes * self.args["n_epochs"]
         ) // self.args["gradient_accumulation_steps"]
         warmup_step = (
             self.args["warmup_step"]
@@ -311,9 +291,7 @@ class SFTTrainer(BaseTrainer):
             },
         ]
 
-        self.optimizer = AdamW(
-            optimizer_grouped_parameters, lr=self.args["learning_rate"], eps=1e-8
-        )
+        self.optimizer = AdamW(optimizer_grouped_parameters, lr=self.args["learning_rate"], eps=1e-8)
         self.scheduler = get_linear_schedule_with_warmup(
             self.optimizer,
             num_warmup_steps=warmup_step,
@@ -359,9 +337,6 @@ class SFTTrainer(BaseTrainer):
             for idx, batch in t:
                 with self.accelerator.accumulate(self.agent.model):
                     output = self.agent.model(**batch["forward_kwargs"])
-                    # train_data_idx = batch["item_id"]
-                    # # Print train_data_idx
-                    # self.accelerator.print("Train data idx:", train_data_idx)
                     # Get some metrics
                     loss = output[0]
                     result_dict, extra = {}, None
@@ -369,9 +344,7 @@ class SFTTrainer(BaseTrainer):
                     self.accelerator.backward(loss)
                     if self.accelerator.sync_gradients:
                         if clip_grad_norm is not None:
-                            self.accelerator.clip_grad_norm_(
-                                self.agent.model.parameters(), clip_grad_norm
-                            )
+                            self.accelerator.clip_grad_norm_(self.agent.model.parameters(), clip_grad_norm)
                     self.optimizer.step()
                     self.optimizer.zero_grad()
                     if self.accelerator.sync_gradients:
@@ -386,10 +359,7 @@ class SFTTrainer(BaseTrainer):
 
                     # Step logging
                     train_log_dict = {}
-                    if (
-                        logging_step_freq is not None
-                        and global_step % logging_step_freq == 0
-                    ):
+                    if logging_step_freq is not None and global_step % logging_step_freq == 0:
                         train_log_dict = {
                             f"T.{k}": sum(v) / len(v) if isinstance(v, list) else v
                             for k, v in epoch_result_dict.items()
@@ -403,15 +373,10 @@ class SFTTrainer(BaseTrainer):
                         if self.accelerator.is_main_process and self.args["wandb_log"]:
                             wandb.log(log_dict, step=global_step)
                             log_dict = {
-                                "wandb": self.args["wandb_project"]
-                                + "|"
-                                + self.args["wandb_run_name"],
+                                "wandb": self.args["wandb_project"] + "|" + self.args["wandb_run_name"],
                                 **log_dict,
                             }
-                        log_dict = {
-                            k: f"{v:.5g}" if isinstance(v, float) else v
-                            for k, v in log_dict.items()
-                        }
+                        log_dict = {k: f"{v:.5g}" if isinstance(v, float) else v for k, v in log_dict.items()}
                         self.accelerator.print(
                             f"[E={epoch}/{self.args['n_epochs']}, S={global_step}] {log_dict}"
                         )
@@ -423,8 +388,7 @@ class SFTTrainer(BaseTrainer):
 
         # Metric summary:
         epoch_result_dict = {
-            k: (sum(v) / len(v) if isinstance(v, list) else v)
-            for k, v in epoch_result_dict.items()
+            k: (sum(v) / len(v) if isinstance(v, list) else v) for k, v in epoch_result_dict.items()
         }
         return epoch_result_dict, global_step
 
@@ -441,33 +405,23 @@ class SFTTrainer(BaseTrainer):
         os.makedirs(model_save_path, exist_ok=True)
         with tqdm(range(1, n_epochs + 1), total=n_epochs, disable=False) as t:
             for epoch in t:
-                train_epoch_result_dict, global_step = self.train_one_epoch(
-                    epoch, global_step
-                )
+                train_epoch_result_dict, global_step = self.train_one_epoch(epoch, global_step)
 
                 eval_log_dict = {}
                 is_best = False
-                if (
-                    evaluating_epoch_freq is not None
-                    and epoch % evaluating_epoch_freq == 0
-                ):
+                if evaluating_epoch_freq is not None and epoch % evaluating_epoch_freq == 0:
                     evaluate_result_dict = {
-                        f"Eval.Gen.{k}": v
-                        for k, v in self.eval_test_dataloader().items()
+                        f"Eval.Gen.{k}": v for k, v in self.eval_test_dataloader().items()
                     }
                     eval_log_dict.update(evaluate_result_dict)
                     if eval_log_dict["Eval.Gen.success"] > self.best_eval_log_dict.get(
                         "Eval.Gen.success_best", 0
                     ):
                         is_best = True
-                        self.best_eval_log_dict["Eval.Gen.success_best"] = (
-                            eval_log_dict["Eval.Gen.success"]
-                        )
+                        self.best_eval_log_dict["Eval.Gen.success_best"] = eval_log_dict["Eval.Gen.success"]
                     if "Eval.Gen.success" not in self.summary_log_dict:
                         self.summary_log_dict["Eval.Gen.success"] = []
-                    self.summary_log_dict["Eval.Gen.success"].append(
-                        eval_log_dict["Eval.Gen.success"]
-                    )
+                    self.summary_log_dict["Eval.Gen.success"].append(eval_log_dict["Eval.Gen.success"])
 
                 train_log_dict = {}
                 if logging_epoch_freq is not None and epoch % logging_epoch_freq == 0:
@@ -486,53 +440,38 @@ class SFTTrainer(BaseTrainer):
                     if self.accelerator.is_main_process and self.args["wandb_log"]:
                         wandb.log(log_dict, step=global_step)
                         log_dict = {
-                            "wandb": self.args["wandb_project"]
-                            + "|"
-                            + self.args["wandb_run_name"],
+                            "wandb": self.args["wandb_project"] + "|" + self.args["wandb_run_name"],
                             **log_dict,
                         }
-                    log_dict = {
-                        k: f"{v:.5g}" if isinstance(v, float) else v
-                        for k, v in log_dict.items()
-                    }
-                    self.accelerator.print(
-                        f"[E={epoch}/{self.args['n_epochs']}, S={global_step}] {log_dict}"
-                    )
+                    log_dict = {k: f"{v:.5g}" if isinstance(v, float) else v for k, v in log_dict.items()}
+                    self.accelerator.print(f"[E={epoch}/{self.args['n_epochs']}, S={global_step}] {log_dict}")
 
                 if saving_epoch_freq is not None and epoch % saving_epoch_freq == 0:
                     # if is_best:
-                    save_path = os.path.join(model_save_path, f"train_epoch_{epoch}")
-                    self.save_model(self.agent.model, self.agent.tokenizer, save_path)
+                    self.save_model(self.agent.model, self.agent.tokenizer, model_save_path)
                     self.agent.model = self.accelerator.unwrap_model(self.agent.model)
+        return
 
-    def eval_test_dataloader(
-        self,
-        dataloader=None,
-        do_sample=False,
-        temperature=1.0,
-        record_to_file=True,
-    ):
-        # test
+    def eval_test_dataloader(self, dataloader=None):
         self.agent.model.eval()
         all_rewards = []
         all_success = []
         if dataloader is None:
             dataloader = self.test_dataloader
 
-        for _, batch in tqdm(
+        for step, batch in tqdm(
             enumerate(dataloader),
             total=len(dataloader),
             disable=not self.accelerator.is_main_process,
             desc="Evaluation Gen Loop",
         ):
             data_idxs = batch["data_idxs"]
-            self.accelerator.print("==== Batch inference data idxs ====", data_idxs)
+
             with torch.no_grad():
                 exps = self.eval(
                     generation_config=GenerationConfig(
                         max_length=4096,
-                        do_sample=do_sample,
-                        temperature=temperature,
+                        do_sample=False,
                         eos_token_id=self.agent.tokenizer.eos_token_id,
                         pad_token_id=(
                             self.agent.tokenizer.pad_token_id
@@ -544,14 +483,75 @@ class SFTTrainer(BaseTrainer):
                     idxs=data_idxs,
                 )
 
-                cur_batch_rewards = torch.FloatTensor(
-                    [exp.reward for exp in exps.experiences]
+                cur_batch_rewards = torch.FloatTensor([exp.reward for exp in exps.experiences]).to(
+                    self.accelerator.device
+                )
+                cur_batch_success = torch.FloatTensor(
+                    [1 if exp.reward == 1 else 0 for exp in exps.experiences]
                 ).to(self.accelerator.device)
+                all_device_batch_rewards = self.accelerator.gather(cur_batch_rewards)
+                all_device_batch_success = self.accelerator.gather(cur_batch_success)
+                all_rewards.extend(all_device_batch_rewards.cpu().numpy().tolist())
+                all_success.extend(all_device_batch_success.cpu().numpy().tolist())
+        # fix for duplicated data
+        all_rewards = all_rewards[: len(dataloader.dataset)]
+        all_success = all_success[: len(dataloader.dataset)]
+
+        if self.accelerator.is_main_process and self.accelerator.is_local_main_process:
+            mean_reward = torch.FloatTensor([np.mean(all_rewards)]).to(self.accelerator.device)
+            mean_success = torch.FloatTensor([np.mean(all_success)]).to(self.accelerator.device)
+        else:
+            mean_reward = torch.FloatTensor([-1.0]).to(self.accelerator.device)
+            mean_success = torch.FloatTensor([-1.0]).to(self.accelerator.device)
+
+        mean_reward = broadcast(mean_reward).cpu().numpy().tolist()[0]
+        mean_success = broadcast(mean_success).cpu().numpy().tolist()[0]
+        self.accelerator.print("\n\n==== Test Evaluation ====\n")
+        self.accelerator.print(f"Score: {mean_reward:.5f}")
+        self.accelerator.print(f"Success: {mean_success:.5f}")
+
+        return {"score": mean_reward, "success": mean_success}
+
+    def inference_and_filter(self, dataloader, iter):
+        self.agent.model.eval()
+        all_rewards = []
+        all_success = []
+
+        iter_data_file_path = os.path.join(self.args["iter_data_path"], f"webshop_iter_{iter + 1}.jsonl")
+
+        for _, batch in tqdm(
+            enumerate(dataloader),
+            total=len(dataloader),
+            disable=not self.accelerator.is_main_process,
+            desc="Inference Gen Loop",
+        ):
+            data_idxs = batch["data_idxs"]
+
+            with torch.no_grad():
+                exps = self.eval(
+                    generation_config=GenerationConfig(
+                        max_length=4096,
+                        do_sample=True,
+                        temperature=1.2,
+                        eos_token_id=self.agent.tokenizer.eos_token_id,
+                        pad_token_id=(
+                            self.agent.tokenizer.pad_token_id
+                            if self.agent.tokenizer.pad_token_id is not None
+                            else self.agent.tokenizer.unk_token_id
+                        ),
+                    ),
+                    max_rounds=self.args["max_round"],
+                    idxs=data_idxs,
+                )
+
+                cur_batch_rewards = torch.FloatTensor([exp.reward for exp in exps.experiences]).to(
+                    self.accelerator.device
+                )
                 cur_batch_success = torch.FloatTensor(
                     [1 if exp.reward == 1 else 0 for exp in exps.experiences]
                 ).to(self.accelerator.device)
                 cur_batch_data_idx = torch.tensor(data_idxs).to(self.accelerator.device)
-                
+
                 # gather operation
                 all_device_batch_rewards = self.accelerator.gather(cur_batch_rewards)
                 all_device_batch_success = self.accelerator.gather(cur_batch_success)
@@ -559,12 +559,11 @@ class SFTTrainer(BaseTrainer):
                 all_device_data_idx = self.accelerator.gather(cur_batch_data_idx)
                 all_rewards.extend(all_device_batch_rewards.cpu().numpy().tolist())
                 all_success.extend(all_device_batch_success.cpu().numpy().tolist())
-                
+
                 # write inference results to file
-                if record_to_file and self.accelerator.is_main_process:
-                    # write to file
+                if self.accelerator.is_main_process:
                     inference_file_path = os.path.join(
-                        self.args["model_save_path"], "inference.jsonl"
+                        self.args["model_save_path"], f"inference_iter_{iter + 1}.jsonl"
                     )
                     with jsonlines.open(inference_file_path, mode="a") as f:
                         for idx, exp in enumerate(all_device_batch_exp):
@@ -581,37 +580,44 @@ class SFTTrainer(BaseTrainer):
                                     "success": cur_success,
                                 }
                             )
+                    # filter data with high reward
+                    with jsonlines.open(iter_data_file_path, mode="a") as f:
+                        for idx, exp in enumerate(all_device_batch_exp):
+                            if exp.reward > 0.99:
+                                cur_idx = all_device_data_idx[idx]
+                                conversation = exp.conversation
+                                item_id = f"webshop_{cur_idx}"
+                                f.write({"conversations": conversation, "item_id": item_id})
 
         # fix for duplicated data
         all_rewards = all_rewards[: len(dataloader.dataset)]
         all_success = all_success[: len(dataloader.dataset)]
 
         if self.accelerator.is_main_process and self.accelerator.is_local_main_process:
-            mean_reward = torch.FloatTensor([np.mean(all_rewards)]).to(
-                self.accelerator.device
-            )
-            mean_success = torch.FloatTensor([np.mean(all_success)]).to(
-                self.accelerator.device
-            )
+            mean_reward = torch.FloatTensor([np.mean(all_rewards)]).to(self.accelerator.device)
+            mean_success = torch.FloatTensor([np.mean(all_success)]).to(self.accelerator.device)
         else:
             mean_reward = torch.FloatTensor([-1.0]).to(self.accelerator.device)
             mean_success = torch.FloatTensor([-1.0]).to(self.accelerator.device)
 
         mean_reward = broadcast(mean_reward).cpu().numpy().tolist()[0]
         mean_success = broadcast(mean_success).cpu().numpy().tolist()[0]
-        self.accelerator.print("\n\n==== Test Evaluation ====\n")
+        self.accelerator.print("\n\n==== Inference Evaluation ====\n")
         self.accelerator.print(f"Score: {mean_reward:.5f}")
         self.accelerator.print(f"Success: {mean_success:.5f}")
 
+        # add original data
+        if self.accelerator.is_main_process and self.accelerator.is_local_main_process:
+            with jsonlines.open(iter_data_file_path, mode="a") as f:
+                for data_item in self.raw_dataset["train"]:
+                    item_id = data_item["item_id"]
+                    conversations = data_item["conversations"]
+                    f.write({"conversations": conversations, "item_id": item_id})
+
         return {"score": mean_reward, "success": mean_success}
 
-    def train_and_inference(self):
-        self.accelerator.print("[SFT Trainer] Start training.")
+    def evol(self):
+        self.accelerator.print(f"[Iter {self.args['iter_num']+1}]")
+
+        self.accelerator.print("[Agent Evol Trainer] Start training.")
         self.train()
-        self.accelerator.print("[SFT Trainer] Start inference.")
-        self.eval_test_dataloader(
-            dataloader=self.inference_dataloader,
-            do_sample=True,
-            temperature=1.2,
-            record_to_file=True,
-        )

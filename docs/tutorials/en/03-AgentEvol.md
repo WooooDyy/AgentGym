@@ -8,4 +8,4 @@ Self-evolution requires the model to explore in the environmens. Please refer to
 
 ## Self Evolution
 
-`agentenv/examples/self_improve` gives a reference implementation of the self-evolution algorithm. Please refer to `examples/self_improve/train_self_improve_multi_task.sh` to start training.
+`agentenv/examples/agentevol` gives a reference implementation of the self-evolution algorithm. Please refer to `examples/agentevol/train_agentevol_multi_task.sh` to start training.
