@@ -157,7 +157,7 @@ do
                     --env_server_base ${cur_env_server_base} \
                     --data_len ${data_len} \
                     --timeout ${timeout} \
-                    > ${iter_save_path}/eval_${cur_task}.log 2>&1 &
+                    > ${iter_save_path}/eval_${cur_task}.log 2>&1
     done
 
     # Step 2: Single process evaluation on test dataset
@@ -208,7 +208,7 @@ do
                     --env_server_base ${cur_env_server_base} \
                     --data_len ${data_len} \
                     --timeout ${timeout} \
-                    > ${iter_save_path}/inference_${cur_task}.log 2>&1 &
+                    > ${iter_save_path}/inference_${cur_task}.log 2>&1
     done
     
     # Step 3: Single process inference on exploration dataset
@@ -228,7 +228,7 @@ do
                 --seed ${seed} \
                 --max_round ${cur_max_round} \
                 --env_server_base ${cur_env_server_base} \
-                > ${iter_save_path}/inference_${cur_task}.log 2>&1 &
+                > ${iter_save_path}/inference_${cur_task}.log 2>&1
     done
 
 
