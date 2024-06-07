@@ -31,11 +31,12 @@ class SciWorldEnv:
     def step(self, idx: int, action: str):
         try:
             self._check_id(idx)
-            ob, reward, done, info = self.env[idx].step(action)
+            # _ is the reward received in this step.
+            # info["score"] is the total reward.
+            ob, _, done, info = self.env[idx].step(action)
             payload = {
                 "observation": ob,
-                "reward": reward,
-                "score": info["score"],
+                "reward": info["score"],
                 "done": done,
             }
             self.info[idx].update(payload)
@@ -51,15 +52,14 @@ class SciWorldEnv:
             )
 
             task_description = self.env[idx].getTaskDescription()
-            ob, reward, done, info = self.env[idx].step("look around")
+            ob, _, done, info = self.env[idx].step("look around")
 
             payload = {
                 "task_name": self.games[data_idx]["taskName"],
                 "var_num": self.games[data_idx]["variationIdx"],
                 "task_description": task_description,
                 "observation": ob,
-                "reward": reward,
-                "score": info["score"],
+                "reward": info["score"],
                 "deleted": False,
                 "done": done,
             }
