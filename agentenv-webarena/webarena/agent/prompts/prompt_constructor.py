@@ -248,7 +248,7 @@ class CoTPromptConstructor(PromptConstructor):
         return prompt
 
     def _extract_action(self, response: str) -> str:
-        # find the first occurence of action
+        # find the first occurrence of action
         action_splitter = self.instruction["meta_data"]["action_splitter"]
         pattern = rf"{action_splitter}((.|\n)*?){action_splitter}"
         match = re.search(pattern, response)
