@@ -327,9 +327,6 @@ class SimServer:
                     idxs.append(idx)
             self.goals = [self.goals[i] for i in idxs]
         print(f'Loaded {len(self.goals)} goals.')
-        with open("/mnt/petrelfs/chenwenxiang/AgentEnvironments/goals.json","w") as f:
-            f.write(json.dumps(self.goals))
-            
 
         # Set extraneous housekeeping variables
         self.weights = [goal['weight'] for goal in self.goals]
