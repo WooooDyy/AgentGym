@@ -52,7 +52,7 @@ cd search_engine
 mkdir -p resources resources_100 resources_1k resources_100k
 python convert_product_file_format.py # convert items.json => required doc format
 mkdir -p indexes
-./run_indexing.sh
+bash ./run_indexing.sh
 cd ..
 
 # Create logging folder + samples of log data
