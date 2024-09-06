@@ -22,11 +22,15 @@ if [ -z "$data" ]; then
 fi
 
 # Install Python Dependencies
-pip install -r requirements.txt;
+pip install -r requirements.txt
 
 # Install Environment Dependencies via `conda`
-conda install -c pytorch faiss-cpu;
-conda install -c conda-forge openjdk=11;
+conda install -y -c pytorch faiss-cpu=1.7.0
+conda install -y -c conda-forge openjdk=11
+
+pip uninstall -y typing_extensions
+pip install  typing_extensions==4.4.0
+
 
 # Download dataset into `data` folder via `gdown` command
 # mkdir -p data;

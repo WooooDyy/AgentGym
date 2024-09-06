@@ -10,6 +10,3 @@ pip install -U python-Levenshtein
 pip install -r requirements.txt
 
 pip install -e .
-
-pip uninstall numpy -y
-pip install numpy -y
