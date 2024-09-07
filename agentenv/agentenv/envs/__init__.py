@@ -10,4 +10,4 @@ from .textcraft import TextCraftEnvClient, TextCraftTask
 from .todo import TodoEnvClient, TodoTask
 from .weather import WeatherEnvClient, WeatherTask
 from .webarena import WebarenaEnvClient, WebarenaTask
-from .webshop import WebshopEnvClient, WebshopTask
+from .webshop import WebshopAdapter, WebshopEnvClient, WebshopTask
