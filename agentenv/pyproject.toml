@@ -14,7 +14,8 @@ dependencies = [
     "jsonlines>=4.0.0",
     "wandb>=0.16.4",
     "tensorboard>=2.17.1",
-    "deepspeed",
+    "torch-tb-profiler>0.4.3",
+    "deepspeed>0.15.0",
 ]
 requires-python = ">=3.11"
 readme = "README.md"
