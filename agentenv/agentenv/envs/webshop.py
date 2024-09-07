@@ -83,7 +83,7 @@ class WebshopAdapter(BaseAdapter):
     @staticmethod
     def parse_function_calling(text: str) -> ActionWithTought:
         _fn_call = json.loads(
-            "{" + text.split("{", 1)[1].rsplit("}", 1)[0] + "}", strict=False
+            "{" + text.split("{", 1)[-1].rsplit("}", 1)[0] + "}", strict=False
         )
         thought = _fn_call["thought"]
         fn_name = _fn_call["function_name"]
@@ -100,17 +100,17 @@ class WebshopAdapter(BaseAdapter):
     def to_function_calling(action_with_thought: ActionWithTought) -> str:
         if action_with_thought.action.startswith("search"):
             fn_name = "search"
-            args = {"keywords": action_with_thought.action.split("[")[1].split("]")[0]}
+            args = {"keywords": action_with_thought.action.split("[")[-1].split("]")[0]}
         elif action_with_thought.action.startswith("click"):
             fn_name = "click"
-            args = {"item": action_with_thought.action.split("[")[1].split("]")[0]}
+            args = {"item": action_with_thought.action.split("[")[-1].split("]")[0]}
         else:
-            raise ValueError(f"Invalid action.")
+            raise ValueError("Invalid action.")
         return json.dumps(
             {
                 "thought": action_with_thought.thought,
                 "function_name": fn_name,
-                "arguments": json.dumps(args, ensure_ascii=False, indent=2),
+                "arguments": args,
             },
             ensure_ascii=False,
             indent=2,
