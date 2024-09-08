@@ -127,14 +127,19 @@ class BaseTask:
         while not done:
             input_length = len(conversation_tokenized["input_ids"])
             # if input_length exceeds 4096, break
-            if input_length > 4096:
+            if input_length >= (generation_config.max_length or 4096):
                 break
-            output = model.generate(
-                torch.tensor(
-                    [conversation_tokenized["input_ids"]], device=model.device
-                ),
-                generation_config=generation_config,
-            )
+            try:
+                output = model.generate(
+                    torch.tensor(
+                        [conversation_tokenized["input_ids"]], device=model.device
+                    ),
+                    generation_config=generation_config,
+                )
+            except Exception as e:
+                print(e)
+                break  # break if generate method raises exceptions
+
             if isinstance(output, GenerateOutput):
                 output = output.sequences
 
