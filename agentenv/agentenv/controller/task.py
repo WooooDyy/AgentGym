@@ -204,14 +204,17 @@ class BaseTask:
     ) -> list[ExperienceOutput]:
         # TODO: "Batch experience generation is not implemented. Generate one by one.",
         client = self.clients[0]
-        result = [self._generate_experience_one(
-                    model=model,
-                    tokenizer=tokenizer,
-                    client=client,
-                    idx=idx,
-                    generation_config=generation_config,
-                    max_rounds=max_rounds,
-                ) for idx in idxs]
+        result = [
+            self._generate_experience_one(
+                model=model,
+                tokenizer=tokenizer,
+                client=client,
+                idx=idx,
+                generation_config=generation_config,
+                max_rounds=max_rounds,
+            )
+            for idx in idxs
+        ]
         return result
 
     def generate_experience(
