@@ -9,7 +9,7 @@ dependencies = [
     "fastapi",
     "uvicorn",
     "gym",
-    "gymnasium",
+    "gymnasium<1.0.0",
     "matplotlib",
     "minigrid"
 ]
