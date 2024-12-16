@@ -11,7 +11,7 @@ dependencies = [
     "gym",
     "gymnasium<1.0.0",
     "matplotlib",
-    "minigrid"
+    "minigrid<2.5.0"
 ]
 readme = "README.md"
 license = {text = "MIT"}
