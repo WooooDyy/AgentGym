@@ -1,7 +1,7 @@
 [project]
 name = "agentenv-mcp"
 version = "0.1.0"
-description = "Simulated Model Context Protocol (MCP) server environment for AgentGym"
+description = "AgentGym environment with internal MCP tools - directional navigation"
 authors = [
     {name = "AgentGym Contributors"},
 ]
@@ -9,17 +9,20 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "pydantic>=2.0.0",
-    "click>=8.1.0",
-    "gymnasium>=0.29.0",
-    "requests>=2.31.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {text = "MIT"}
 
 [project.scripts]
-mcp = "agentenv_mcp.mcp_launch:main"
+mcp = "agentenv_mcp.launch:launch"
 
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.0",
+    "requests>=2.31.0",
+]
