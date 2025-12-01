@@ -1,0 +1,117 @@
+{
+  "episodes": [
+    {
+      "episode_id": 0,
+      "data_idx": 0,
+      "total_reward": 0.4,
+      "total_steps": 4,
+      "success": true,
+      "transitions": [
+        {
+          "step": 1,
+          "action": "right",
+          "observation": "Moved right. Current position: (1, 0). Steps taken: 1",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 2,
+          "action": "right",
+          "observation": "Moved right. Current position: (2, 0). Steps taken: 2",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 3,
+          "action": "up",
+          "observation": "Moved up. Current position: (2, 1). Steps taken: 3",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 4,
+          "action": "up",
+          "observation": "Moved up. Current position: (2, 2). Steps taken: 4",
+          "reward": 0.1,
+          "done": false
+        }
+      ]
+    },
+    {
+      "episode_id": 1,
+      "data_idx": 1,
+      "total_reward": 0.30000000000000004,
+      "total_steps": 3,
+      "success": true,
+      "transitions": [
+        {
+          "step": 1,
+          "action": "left",
+          "observation": "Moved left. Current position: (-1, 0). Steps taken: 1",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 2,
+          "action": "left",
+          "observation": "Moved left. Current position: (-2, 0). Steps taken: 2",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 3,
+          "action": "down",
+          "observation": "Moved down. Current position: (-2, -1). Steps taken: 3",
+          "reward": 0.1,
+          "done": false
+        }
+      ]
+    },
+    {
+      "episode_id": 2,
+      "data_idx": 2,
+      "total_reward": 0.4,
+      "total_steps": 4,
+      "success": true,
+      "transitions": [
+        {
+          "step": 1,
+          "action": "up",
+          "observation": "Moved up. Current position: (0, 1). Steps taken: 1",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 2,
+          "action": "right",
+          "observation": "Moved right. Current position: (1, 1). Steps taken: 2",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 3,
+          "action": "up",
+          "observation": "Moved up. Current position: (1, 2). Steps taken: 3",
+          "reward": 0.1,
+          "done": false
+        },
+        {
+          "step": 4,
+          "action": "left",
+          "observation": "Moved left. Current position: (0, 2). Steps taken: 4",
+          "reward": 0.1,
+          "done": false
+        }
+      ]
+    }
+  ],
+  "statistics": {
+    "num_episodes": 3,
+    "avg_reward": 0.3666666666666667,
+    "min_reward": 0.30000000000000004,
+    "max_reward": 0.4,
+    "avg_steps": 3.6666666666666665,
+    "success_rate": 1.0,
+    "total_transitions": 11
+  }
+}

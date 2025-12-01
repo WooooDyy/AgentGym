@@ -1,7 +1,7 @@
 [project]
 name = "agentenv-mcp"
-version = "0.1.0"
-description = "AgentGym environment with internal MCP tools - directional navigation"
+version = "0.2.0"
+description = "AgentGym environment with MCP client/server architecture via SSE"
 authors = [
     {name = "AgentGym Contributors"},
 ]
@@ -9,6 +9,7 @@ dependencies = [
     "fastapi>=0.104.0",
     "uvicorn>=0.24.0",
     "pydantic>=2.0.0",
+    "fastmcp>=0.2.0",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
@@ -16,6 +17,7 @@ license = {text = "MIT"}
 
 [project.scripts]
 mcp = "agentenv_mcp.launch:launch"
+mcp-client = "agentenv_mcp.launch_mcp:launch_mcp"
 
 [build-system]
 requires = ["hatchling"]

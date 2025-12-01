@@ -10,7 +10,7 @@ from .task_rewards import (
     ToolCallReward,
     QueryAnswerReward,
     GoalBasedReward,
-    create_reward_calculator
+    create_reward_calculator,
 )
 
 __all__ = [

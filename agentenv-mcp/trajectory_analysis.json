@@ -1,0 +1,146 @@
+{
+  "overall_stats": {
+    "num_episodes": 3,
+    "avg_reward": 0.3666666666666667,
+    "min_reward": 0.30000000000000004,
+    "max_reward": 0.4,
+    "avg_steps": 3.6666666666666665,
+    "success_rate": 1.0,
+    "total_transitions": 11
+  },
+  "reward_analysis": {
+    "per_episode": {
+      "mean": 0.3666666666666667,
+      "std": 0.04714045207910316,
+      "min": 0.30000000000000004,
+      "max": 0.4,
+      "all_rewards": [
+        0.4,
+        0.30000000000000004,
+        0.4
+      ]
+    },
+    "per_step": {
+      "mean": 0.1,
+      "min": 0.1,
+      "max": 0.1,
+      "all_rewards": [
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1,
+        0.1
+      ]
+    }
+  },
+  "action_analysis": {
+    "action_counts": {
+      "right": 3,
+      "up": 4,
+      "left": 3,
+      "down": 1
+    },
+    "action_frequencies": {
+      "right": 0.2727272727272727,
+      "up": 0.36363636363636365,
+      "left": 0.2727272727272727,
+      "down": 0.09090909090909091
+    },
+    "total_actions": 11,
+    "unique_actions": 4
+  },
+  "state_analysis": {
+    "unique_states_visited": 11,
+    "most_common_states": [
+      [
+        "(1, 0)",
+        1
+      ],
+      [
+        "(2, 0)",
+        1
+      ],
+      [
+        "(2, 1)",
+        1
+      ],
+      [
+        "(2, 2)",
+        1
+      ],
+      [
+        "(-1, 0)",
+        1
+      ]
+    ],
+    "final_states": {
+      "(2, 2)": 1,
+      "(-2, -1)": 1,
+      "(0, 2)": 1
+    },
+    "total_state_visits": 11
+  },
+  "episode_metrics": [
+    {
+      "episode_id": 0,
+      "total_reward": 0.4,
+      "total_steps": 4,
+      "efficiency": 0.1,
+      "success": true,
+      "path": [
+        "(1, 0)",
+        "(2, 0)",
+        "(2, 1)",
+        "(2, 2)"
+      ],
+      "actions": [
+        "right",
+        "right",
+        "up",
+        "up"
+      ]
+    },
+    {
+      "episode_id": 1,
+      "total_reward": 0.30000000000000004,
+      "total_steps": 3,
+      "efficiency": 0.10000000000000002,
+      "success": true,
+      "path": [
+        "(-1, 0)",
+        "(-2, 0)",
+        "(-2, -1)"
+      ],
+      "actions": [
+        "left",
+        "left",
+        "down"
+      ]
+    },
+    {
+      "episode_id": 2,
+      "total_reward": 0.4,
+      "total_steps": 4,
+      "efficiency": 0.1,
+      "success": true,
+      "path": [
+        "(0, 1)",
+        "(1, 1)",
+        "(1, 2)",
+        "(0, 2)"
+      ],
+      "actions": [
+        "up",
+        "right",
+        "up",
+        "left"
+      ]
+    }
+  ]
+}

@@ -19,7 +19,7 @@ class ToolCallReward(RewardCalculator):
         self,
         expected_tools: List[str],
         max_reward: float = 1.0,
-        partial_credit: bool = True
+        partial_credit: bool = True,
     ):
         """
         Initialize tool call reward calculator.
@@ -35,12 +35,7 @@ class ToolCallReward(RewardCalculator):
         self.completed_tools: List[str] = []
         self.num_expected = len(expected_tools)
 
-    def calculate(
-        self,
-        observation: str,
-        action: str,
-        info: Dict[str, Any]
-    ) -> float:
+    def calculate(self, observation: str, action: str, info: Dict[str, Any]) -> float:
         """Calculate reward based on tool call progress."""
         # Extract tool name from action or observation
         tool_name = self._extract_tool_name(action)
@@ -56,7 +51,9 @@ class ToolCallReward(RewardCalculator):
 
                 if self.partial_credit:
                     # Give partial reward for each correct tool
-                    return (len(self.completed_tools) / self.num_expected) * self.max_reward
+                    return (
+                        len(self.completed_tools) / self.num_expected
+                    ) * self.max_reward
                 elif len(self.completed_tools) == self.num_expected:
                     # Only give reward when all tools are used
                     return self.max_reward
@@ -94,7 +91,7 @@ class QueryAnswerReward(RewardCalculator):
         self,
         required_info: List[str],
         answer_checker: Optional[Callable[[str], bool]] = None,
-        max_reward: float = 1.0
+        max_reward: float = 1.0,
     ):
         """
         Initialize query-answer reward calculator.
@@ -110,16 +107,13 @@ class QueryAnswerReward(RewardCalculator):
         self.gathered_info: List[str] = []
         self.answer_provided = False
 
-    def calculate(
-        self,
-        observation: str,
-        action: str,
-        info: Dict[str, Any]
-    ) -> float:
+    def calculate(self, observation: str, action: str, info: Dict[str, Any]) -> float:
         """Calculate reward based on information gathering and answer quality."""
         # Check for information gathering
         for pattern in self.required_info:
-            if pattern not in self.gathered_info and self._matches_pattern(observation, pattern):
+            if pattern not in self.gathered_info and self._matches_pattern(
+                observation, pattern
+            ):
                 self.gathered_info.append(pattern)
 
         # Check for final answer
@@ -139,13 +133,14 @@ class QueryAnswerReward(RewardCalculator):
             return (info_reward + answer_reward) * self.max_reward
 
         # Partial reward for gathering information
-        return (len(self.gathered_info) / len(self.required_info)) * 0.5 * self.max_reward
+        return (
+            (len(self.gathered_info) / len(self.required_info)) * 0.5 * self.max_reward
+        )
 
     def is_goal_reached(self) -> bool:
         """Check if all information gathered and answer provided."""
         return (
-            len(self.gathered_info) == len(self.required_info) and
-            self.answer_provided
+            len(self.gathered_info) == len(self.required_info) and self.answer_provided
         )
 
     def reset(self):
@@ -181,7 +176,7 @@ class GoalBasedReward(RewardCalculator):
         self,
         goal_checker: Callable[[List[str], Dict[str, Any]], float],
         milestones: Optional[List[Callable[[str, Dict[str, Any]], bool]]] = None,
-        max_reward: float = 1.0
+        max_reward: float = 1.0,
     ):
         """
         Initialize goal-based reward calculator.
@@ -197,12 +192,7 @@ class GoalBasedReward(RewardCalculator):
         self.milestones = milestones or []
         self.completed_milestones: List[int] = []
 
-    def calculate(
-        self,
-        observation: str,
-        action: str,
-        info: Dict[str, Any]
-    ) -> float:
+    def calculate(self, observation: str, action: str, info: Dict[str, Any]) -> float:
         """Calculate reward using custom goal checker."""
         # Check milestones
         for i, milestone_fn in enumerate(self.milestones):
@@ -226,9 +216,7 @@ class GoalBasedReward(RewardCalculator):
 
 
 def create_reward_calculator(
-    task_type: str,
-    task_config: Dict[str, Any],
-    max_reward: float = 1.0
+    task_type: str, task_config: Dict[str, Any], max_reward: float = 1.0
 ) -> RewardCalculator:
     """
     Factory function to create reward calculator based on task type.
@@ -245,21 +233,21 @@ def create_reward_calculator(
         return ToolCallReward(
             expected_tools=task_config.get("expected_tools", []),
             max_reward=max_reward,
-            partial_credit=task_config.get("partial_credit", True)
+            partial_credit=task_config.get("partial_credit", True),
         )
 
     elif task_type == "query_answer":
         return QueryAnswerReward(
             required_info=task_config.get("required_info", []),
             answer_checker=task_config.get("answer_checker"),
-            max_reward=max_reward
+            max_reward=max_reward,
         )
 
     elif task_type == "custom":
         return GoalBasedReward(
             goal_checker=task_config["goal_checker"],
             milestones=task_config.get("milestones"),
-            max_reward=max_reward
+            max_reward=max_reward,
         )
 
     else:

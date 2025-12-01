@@ -40,12 +40,12 @@ def test_environment():
     # Define a sequence of actions to reach position (2, 2)
     actions = ["right", "right", "up", "up", "get_position"]
 
-    print(f"\n4. Executing actions to reach (2, 2)...")
+    print("\n4. Executing actions to reach (2, 2)...")
     total_reward = 0.0
 
     for i, action in enumerate(actions):
         print(f"\n   Step {i + 1}: {action}")
-        print(f"   " + "-" * 56)
+        print("   " + "-" * 56)
 
         resp = requests.post(f"{base_url}/step", json={"id": env_id, "action": action})
         result = resp.json()
@@ -59,21 +59,21 @@ def test_environment():
         print(f"   Score: {result['score']:.2f}")
         print(f"   Done: {result['done']}")
 
-        total_reward += result['reward']
+        total_reward += result["reward"]
 
-        if result['done']:
-            print(f"\n   Episode finished!")
+        if result["done"]:
+            print("\n   Episode finished!")
             break
 
     # Get observation
-    print(f"\n5. Getting final observation...")
+    print("\n5. Getting final observation...")
     resp = requests.get(f"{base_url}/observation", params={"id": env_id})
     result = resp.json()
     print(f"   {result['observation']}")
     print(f"   Total score: {result['score']:.2f}")
 
     # Close environment
-    print(f"\n6. Closing environment...")
+    print("\n6. Closing environment...")
     resp = requests.post(f"{base_url}/close", json={"id": env_id})
     print(f"   Closed: {resp.json()}")
 
@@ -117,7 +117,7 @@ def test_multiple_instances():
     resp1 = requests.get(f"{base_url}/observation", params={"id": env1})
     resp2 = requests.get(f"{base_url}/observation", params={"id": env2})
 
-    print(f"\nFinal positions:")
+    print("\nFinal positions:")
     print(f"  Environment {env1}: {resp1.json()['observation']}")
     print(f"  Environment {env2}: {resp2.json()['observation']}")
 
@@ -141,11 +141,13 @@ if __name__ == "__main__":
             requests.get("http://localhost:8004/health", timeout=1)
             print("✓ Server is ready!\n")
             break
-        except:
+        except requests.exceptions.RequestException:
             time.sleep(1)
     else:
         print("⚠ Server not responding. Make sure to start it first:")
-        print("  uv run python -m agentenv_mcp.launch --example directional --port 8004")
+        print(
+            "  uv run python -m agentenv_mcp.launch --example directional --port 8004"
+        )
         exit(1)
 
     # Run tests
@@ -160,4 +162,5 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n✗ Test failed: {e}")
         import traceback
+
         traceback.print_exc()

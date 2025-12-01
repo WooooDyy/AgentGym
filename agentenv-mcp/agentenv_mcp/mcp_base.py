@@ -44,7 +44,9 @@ class MCPToolSet(ABC):
         pass
 
     @abstractmethod
-    def execute_tool(self, tool_name: str, state: MCPState, params: Dict[str, Any] = None) -> str:
+    def execute_tool(
+        self, tool_name: str, state: MCPState, params: Dict[str, Any] = None
+    ) -> str:
         """
         Execute a tool on the given state.
 

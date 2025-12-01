@@ -3,7 +3,7 @@ Base reward calculator for MCP environment.
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 
 
 class RewardCalculator(ABC):
@@ -27,12 +27,7 @@ class RewardCalculator(ABC):
         self.observation_history: List[str] = []
 
     @abstractmethod
-    def calculate(
-        self,
-        observation: str,
-        action: str,
-        info: Dict[str, Any]
-    ) -> float:
+    def calculate(self, observation: str, action: str, info: Dict[str, Any]) -> float:
         """
         Calculate reward for current step.
 
@@ -56,12 +51,7 @@ class RewardCalculator(ABC):
         """
         pass
 
-    def update(
-        self,
-        observation: str,
-        action: str,
-        info: Dict[str, Any]
-    ) -> float:
+    def update(self, observation: str, action: str, info: Dict[str, Any]) -> float:
         """
         Update reward state and return reward for this step.
 

@@ -17,7 +17,7 @@ from .environment import server
 app = FastAPI(
     title="AgentEnv MCP",
     description="Gymnasium environment with internal MCP tools",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 
@@ -97,8 +97,4 @@ def close(body: CloseRequestBody):
 @app.get("/health")
 def health():
     """Health check endpoint."""
-    return {
-        "status": "healthy",
-        "active_envs": len(server.envs),
-        "version": "0.1.0"
-    }
+    return {"status": "healthy", "active_envs": len(server.envs), "version": "0.1.0"}

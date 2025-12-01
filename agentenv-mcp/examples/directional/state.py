@@ -5,9 +5,10 @@ A simple MCP server with 4 directional tools: up, down, left, right.
 The agent navigates a 2D grid.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 import sys
 import os
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agentenv_mcp.mcp_base import MCPState, MCPToolSet
@@ -75,7 +76,9 @@ class DirectionalToolSet(MCPToolSet):
         """Get current position."""
         return state.get_observation()
 
-    def execute_tool(self, tool_name: str, state: MCPState, params: Dict[str, Any] = None) -> str:
+    def execute_tool(
+        self, tool_name: str, state: MCPState, params: Dict[str, Any] = None
+    ) -> str:
         """
         Execute a tool on the given state.
 

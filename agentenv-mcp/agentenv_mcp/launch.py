@@ -14,8 +14,12 @@ def launch():
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--host", type=str, default="0.0.0.0")
-    parser.add_argument("--example", type=str, default="directional",
-                       help="Example to load (directional, ...)")
+    parser.add_argument(
+        "--example",
+        type=str,
+        default="directional",
+        help="Example to load (directional, ...)",
+    )
     args = parser.parse_args()
 
     # Load the MCP implementation
@@ -29,8 +33,8 @@ def launch():
 
         # Configure server with directional tools
         server.set_factories(DirectionalToolSet, DirectionalState)
-        print(f"Loaded example: Directional Navigation")
-        print(f"Tools: up, down, left, right, get_position")
+        print("Loaded example: Directional Navigation")
+        print("Tools: up, down, left, right, get_position")
     else:
         print(f"Unknown example: {args.example}")
         print("Available examples: directional")

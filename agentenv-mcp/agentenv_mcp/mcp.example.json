@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "directional": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "examples.directional.server"
+      ],
+      "url": "http://localhost:8001",
+      "description": "Directional navigation MCP server - navigate a 2D grid"
+    },
+    "directional-remote": {
+      "url": "http://localhost:8001",
+      "description": "Connect to already-running directional MCP server (no auto-start)"
+    }
+  },
+  "defaultServer": "directional"
+}

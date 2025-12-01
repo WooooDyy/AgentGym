@@ -1,73 +1,68 @@
 """
-Generic MCP Environment - Works with any MCP tool implementation.
+MCP-based Environment using MCP Clients.
 
-The environment is completely agnostic to what tools exist.
-Tools are injected via MCPToolSet implementations.
+This environment connects to external MCP servers and uses their tools
+as the action space.
 """
 
-import threading
-from typing import Dict, Any, Optional, List
-from .mcp_base import MCPState, MCPToolSet
-from .rewards import RewardCalculator
+from typing import Dict, Any, List
+from .mcp_client import MCPClient, MCPClientManager
 
 
-class MCPEnvironment:
+class MCPBasedEnvironment:
     """
-    Generic MCP environment instance.
+    Environment that uses MCP clients to interact with MCP servers.
 
-    Works with any MCPToolSet and MCPState implementation.
-    Actions = tool calls. Observations = tool results.
+    Actions = MCP tool calls
+    Observations = MCP tool results
     """
 
     def __init__(
         self,
-        toolset: MCPToolSet,
-        state: MCPState,
+        mcp_client: MCPClient,
         task_description: str = "Interact with MCP tools",
-        reward_calculator: Optional[RewardCalculator] = None,
         max_steps: int = 50,
     ):
         """
-        Initialize environment instance.
+        Initialize MCP-based environment.
 
         Args:
-            toolset: MCP tool set implementation
-            state: MCP state implementation
+            mcp_client: MCP client for tool execution
             task_description: Description of the task
-            reward_calculator: Optional reward calculator
             max_steps: Maximum steps per episode
         """
-        self.toolset = toolset
-        self.state = state
+        self.mcp_client = mcp_client
         self.task_description = task_description
-        self.reward_calculator = reward_calculator
         self.max_steps = max_steps
 
         # Episode state
         self.current_step = 0
         self.total_reward = 0.0
         self.done = False
+        self.history: List[str] = []
 
     def reset(self) -> str:
         """Reset environment to initial state."""
-        self.state.reset()
         self.current_step = 0
         self.total_reward = 0.0
         self.done = False
+        self.history = []
 
-        if self.reward_calculator:
-            self.reward_calculator.reset()
+        # Call reset tool if available
+        tools = self.mcp_client.list_tools()
+        if "reset" in tools:
+            self.mcp_client.call_tool("reset")
 
         # Return initial observation
         obs = f"Task: {self.task_description}\n\n"
-        obs += f"{self.state.get_observation()}\n\n"
-        obs += f"Available actions: {self.toolset.get_action_space()}"
+        obs += "Environment initialized.\n"
+        obs += f"Available actions: {tools}"
 
         return obs
 
     def step(self, action: str) -> Dict[str, Any]:
         """
-        Execute an action (tool call).
+        Execute an action (MCP tool call).
 
         Args:
             action: Tool name to execute
@@ -84,18 +79,13 @@ class MCPEnvironment:
             }
 
         self.current_step += 1
+        self.history.append(action)
 
-        # Execute tool on state
-        observation = self.toolset.execute_tool(action, self.state)
+        # Execute tool via MCP client
+        observation = self.mcp_client.call_tool(action)
 
-        # Calculate reward
-        reward = 0.1  # Default small reward for valid action
-
-        if self.reward_calculator:
-            reward = self.reward_calculator.update(observation, action, {})
-            if self.reward_calculator.is_goal_reached():
-                self.done = True
-
+        # Calculate reward (simple: 0.1 for valid action)
+        reward = 0.1 if not observation.startswith("Error") else -0.1
         self.total_reward += reward
 
         # Check max steps
@@ -111,55 +101,59 @@ class MCPEnvironment:
 
     def observe(self) -> str:
         """Get current observation without taking action."""
-        return self.state.get_observation()
+        tools = self.mcp_client.list_tools()
+        obs = f"Step {self.current_step}/{self.max_steps}\n"
+        obs += f"Available actions: {tools}\n"
+        if self.history:
+            obs += f"Last action: {self.history[-1]}"
+        return obs
 
     def get_action_space(self) -> List[str]:
-        """Get available actions."""
-        return self.toolset.get_action_space()
+        """Get available actions (MCP tools)."""
+        return self.mcp_client.list_tools()
 
 
-class MCPEnvServer:
+class MCPEnvServerV2:
     """
-    Generic multi-instance environment manager.
+    Multi-instance environment manager for MCP-based environments.
 
-    Manages multiple MCPEnvironment instances with pluggable tool sets.
+    Uses MCP clients to provide tools from external MCP servers.
     """
 
-    def __init__(self, toolset_factory=None, state_factory=None):
+    def __init__(self, config_path: str = None):
         """
         Initialize server.
 
         Args:
-            toolset_factory: Factory function to create MCPToolSet instances
-            state_factory: Factory function to create MCPState instances
+            config_path: Path to mcp.json configuration file
         """
         self._max_id = 0
-        self.envs: Dict[int, MCPEnvironment] = {}
+        self.envs: Dict[int, MCPBasedEnvironment] = {}
         self.info: Dict[int, Dict[str, Any]] = {}
         self.ls: list = []
-        self._lock = threading.Lock()
 
-        # Factories for creating tool sets and states
-        self.toolset_factory = toolset_factory
-        self.state_factory = state_factory
+        # MCP client manager
+        self.mcp_manager = MCPClientManager(config_path)
+        self.default_client_name = None
 
-    def set_factories(self, toolset_factory, state_factory):
+    def set_mcp_config(self, config_path: str, default_client: str = None):
         """
-        Set factories for creating tool sets and states.
+        Configure MCP clients.
 
         Args:
-            toolset_factory: Callable that returns MCPToolSet instance
-            state_factory: Callable that returns MCPState instance
+            config_path: Path to mcp.json
+            default_client: Name of default MCP client to use
         """
-        self.toolset_factory = toolset_factory
-        self.state_factory = state_factory
+        self.mcp_manager = MCPClientManager(config_path)
+        self.mcp_manager.initialize_clients()
+        self.mcp_manager.connect_all()
+        self.default_client_name = default_client
 
     def create(self) -> Dict[str, int]:
         """Create a new environment instance."""
         try:
-            with self._lock:
-                idx = self._max_id
-                self._max_id += 1
+            idx = self._max_id
+            self._max_id += 1
 
             self.info[idx] = {"deleted": False, "done": False}
             self.ls.append(idx)
@@ -180,23 +174,23 @@ class MCPEnvServer:
             Dict with observation, reward, score, done
         """
         try:
-            if not self.toolset_factory or not self.state_factory:
-                return {
-                    "error": "Toolset and state factories not configured. Call set_factories() first."
-                }
+            # Get MCP client
+            if not self.default_client_name:
+                # Use first available client
+                if self.mcp_manager.clients:
+                    self.default_client_name = list(self.mcp_manager.clients.keys())[0]
+                else:
+                    return {"error": "No MCP clients configured"}
+
+            mcp_client = self.mcp_manager.get_client(self.default_client_name)
+            if not mcp_client:
+                return {"error": f"MCP client '{self.default_client_name}' not found"}
 
             # Create environment if it doesn't exist
             if env_id not in self.envs:
-                toolset = self.toolset_factory()
-                state = self.state_factory()
                 task = f"Complete task {data_idx}"
-
-                self.envs[env_id] = MCPEnvironment(
-                    toolset=toolset,
-                    state=state,
-                    task_description=task,
-                    reward_calculator=None,
-                    max_steps=50,
+                self.envs[env_id] = MCPBasedEnvironment(
+                    mcp_client=mcp_client, task_description=task, max_steps=50
                 )
 
             # Reset the environment
@@ -295,6 +289,9 @@ class MCPEnvServer:
             except Exception:
                 pass
 
+        # Close all MCP clients
+        self.mcp_manager.close_all()
+
 
 # Global server instance
-server = MCPEnvServer()
+server_v2 = MCPEnvServerV2()
