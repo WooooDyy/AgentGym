@@ -7,3 +7,4 @@ requests==2.27.1
 requests_mock
 typing_extensions==4.5.0
 typing-inspect==0.8.0
+geopy==2.4.1
