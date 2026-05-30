@@ -34,6 +34,10 @@ from agentenv.envs import (
 )
 
 
+def is_success_reward(reward: float) -> int:
+    return int(reward in (1, 100))
+
+
 @dataclass
 class EvalArguments:
     model_path: str
@@ -157,7 +161,7 @@ def main(args):
             for exp in cur_experiences:
                 conversation = exp.conversation
                 cur_reward = exp.reward
-                cur_success = 1 if exp.reward == 1 else 0
+                cur_success = is_success_reward(cur_reward)
                 item_id = f"{args['task_name']}_{data_idx}"
                 f.write(
                     {

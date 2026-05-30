@@ -2,10 +2,13 @@ beautifulsoup4==4.11.1
 cleantext==1.1.4
 env==0.1.0
 Flask==2.1.2
+Werkzeug<2.3
 gdown
-gradio
+gradio<4.0.0
 gym==0.24.0
 numpy==1.22.4
+pydantic>=1.7.4,<1.9.0,!=1.8,!=1.8.1
+typing-extensions<4.6.0
 pandas==1.4.2
 pyserini==0.17.0
 pytest

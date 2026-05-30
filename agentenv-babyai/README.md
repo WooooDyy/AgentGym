@@ -3,7 +3,7 @@
 ## Setup
 
 ``` sh
-conda create --name agentenv-babyai
+conda create --name agentenv-babyai python=3.9
 conda activate agentenv-babyai
 pip install -e .
 ```
@@ -11,5 +11,5 @@ pip install -e .
 ## Launch
 
 ``` sh
-babyai --host 0.0.0.0 --port 36001
+babyai --host 0.0.0.0 --port 36003
 ```

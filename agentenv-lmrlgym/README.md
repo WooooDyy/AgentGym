@@ -15,4 +15,4 @@ bash ./setup.sh
 lmrlgym --host 0.0.0.0 --port 36001
 ```
 
-Note: When using make or wordle, your base URL should be `http://127.0.0.1:<port>/maze/` or `http://127.0.0.1:<port>/wordle/`.
+Note: When using maze or wordle, your base URL should be `http://127.0.0.1:<port>/maze/` or `http://127.0.0.1:<port>/wordle/`.

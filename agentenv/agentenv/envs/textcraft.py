@@ -93,6 +93,9 @@ class TextCraftEnvClient(BaseEnvClient):
         action = action_matches[-1] if action_matches else ""
         action = re.sub(r"[^A-Za-z0-9, ]+", "", action)
         action = " ".join(action.split()).strip()
+        # Normalize: "look" is invalid; TextCraft expects "inventory" for viewing items
+        if action.lower() == "look":
+            action = "inventory"
         response = self._post("step", {"action": action})
         self.info = {
             "observation": response["observation"],

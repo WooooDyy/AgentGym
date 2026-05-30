@@ -578,23 +578,40 @@ class AlfWorldEnvClient(BaseEnvClient):
         # print(f"Action: {action}")
         response = self._post("step", {"action": action})
         # print(response)
+        if "observation" not in response:
+            raise KeyError(
+                f"AlfWorld step response missing 'observation': {json.dumps(response, ensure_ascii=True)}"
+            )
         self.info = {
             "observation": response["observation"],
-            "available_actions": response["available_actions"],
-            "reward": response["reward"],
-            "done": response["done"],
+            "available_actions": response.get("available_actions", []),
+            "reward": response.get("reward", 0.0),
+            "done": response.get("done", False),
         }
         return StepOutput(
             state=response["observation"],
-            reward=response["reward"],
-            done=response["done"],
+            reward=response.get("reward", 0.0),
+            done=response.get("done", False),
         )
 
     def reset(self, game: int, world_type: str = "Text") -> dict[str, Any]:
-        response = self._post("reset", {"game": game, "world_type": world_type})
+        response = {}
+        for retry in range(3):
+            response = self._post("reset", {"game": game, "world_type": world_type})
+            if "observation" in response:
+                break
+            print(
+                f"[AlfWorldEnvClient.reset] malformed response (attempt {retry + 1}/3): "
+                f"{json.dumps(response, ensure_ascii=True)}"
+            )
+        if "observation" not in response:
+            raise KeyError(
+                "AlfWorld reset failed after 3 attempts; "
+                f"missing 'observation' in response: {json.dumps(response, ensure_ascii=True)}"
+            )
         self.info = {
             "observation": response["observation"],
-            "available_actions": response["available_actions"],
+            "available_actions": response.get("available_actions", []),
             "reward": 0,
             "done": False,
         }

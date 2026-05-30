@@ -32,6 +32,10 @@ import os
 import random
 
 
+def is_success_reward(reward: float) -> int:
+    return int(reward in (1, 100))
+
+
 @dataclass
 class EvalArguments:
     api_key: str
@@ -121,7 +125,7 @@ def main(args):
             with open(os.path.join(args["output_dir"], f"{args['task_name']}_{data_idx}.json"), 'r') as f:
                 item = json.load(f)
                 total_score += item["reward"]
-                total_success += item["success"]
+                total_success += is_success_reward(item["reward"])
             continue
         except:
             pass
@@ -145,7 +149,7 @@ def main(args):
             for exp in cur_experiences:
                 conversation = exp.conversation
                 cur_reward = exp.reward
-                cur_success = 1 if exp.reward == 1 else 0
+                cur_success = is_success_reward(cur_reward)
                 item_id = f"{args['task_name']}_{data_idx}"
                 json.dump({
                     "conversations": conversation,

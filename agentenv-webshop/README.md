@@ -11,5 +11,5 @@ bash ./setup.sh
 ## Launch
 
 ``` sh
-webshop --host 0.0.0.0 --port 36001
+webshop --host 0.0.0.0 --port 36006
 ```
