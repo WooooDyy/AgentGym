@@ -9,7 +9,7 @@ import BaseEnvClient from '../../../shared/services/baseClient.js';
 
 class SearchQAClient extends BaseEnvClient {
   constructor() {
-    super('http://localhost:36005');
+    super('/api/searchqa');  // Uses vite proxy
     this.interactionHistory = new Map();
     this.environmentState = new Map();
     this.lastActionByEnv = new Map(); // Track last action per environment

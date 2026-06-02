@@ -6,7 +6,8 @@ import BaseEnvClient from '../../../shared/services/baseClient.js';
 
 class SciWorldClient extends BaseEnvClient {
   constructor() {
-    super('http://localhost:36003');
+    // Use the vite proxy path for API calls
+    super('/api/sciworld');
     console.log('🔬 SciWorldClient initialized');
   }
 

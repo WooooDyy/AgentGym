@@ -11,7 +11,7 @@ import BaseEnvClient from '../../../shared/services/baseClient.js';
 
 class WebArenaClient extends BaseEnvClient {
   constructor() {
-    super('http://localhost:36004');  // Updated to match server default port
+    super('/api/webarena');  // Uses vite proxy
     console.log('🔨 WebArenaClient initialized');
   }
 

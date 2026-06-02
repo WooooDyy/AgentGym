@@ -9,7 +9,7 @@ import assetManager from '../../../shared/services/assetManager.js';
 
 class TextCraftClient extends BaseEnvClient {
   constructor() {
-    super('http://localhost:36001');
+    super('/api/textcraft');  // Uses vite proxy
     this.inventoryCache = new Map();
     this.interactionHistory = new Map();
     this.goalCache = new Map();

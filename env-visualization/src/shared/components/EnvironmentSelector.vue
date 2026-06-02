@@ -35,6 +35,20 @@
           </div>
           <div class="icon-glow" :style="{ '--glow-color': env.color }"></div>
           
+          <!-- 服务器可用性状态指示器 -->
+          <div 
+            class="availability-indicator"
+            :class="{
+              'available': isEnvAvailable(env.id),
+              'unavailable': availabilityChecked && !isEnvAvailable(env.id),
+              'checking': !availabilityChecked
+            }"
+            :title="getAvailabilityStatus(env.id)"
+          >
+            <span class="status-dot"></span>
+            <span class="status-text">{{ getAvailabilityStatus(env.id) }}</span>
+          </div>
+          
           <!-- 添加难度指示器 -->
           <div class="difficulty-indicator">
             <div class="difficulty-stars">
@@ -164,7 +178,7 @@
 
 <script>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { environmentList } from '../../environments/index.js'
+import { environmentList, checkAllEnvironmentsAvailability } from '../../environments/index.js'
 
 export default {
   name: 'EnvironmentSelector',
@@ -177,6 +191,10 @@ export default {
     const previewEnv = ref(null)
     const helpVisible = ref(false)
     const currentFactIndex = ref(0)
+    
+    // Environment availability state
+    const envAvailability = ref({})
+    const availabilityChecked = ref(false)
 
     // 有趣的事实轮播
     const funFacts = [
@@ -279,6 +297,33 @@ export default {
       return tags[envId] || ['General']
     }
 
+    // Check if environment is available (server running)
+    const isEnvAvailable = (envId) => {
+      return envAvailability.value[envId]?.available || false
+    }
+
+    // Get availability status text
+    const getAvailabilityStatus = (envId) => {
+      if (!availabilityChecked.value) return 'Checking...'
+      const status = envAvailability.value[envId]
+      if (!status) return 'Unknown'
+      return status.available ? 'Online' : 'Offline'
+    }
+
+    // Check all environment availability
+    const checkAvailability = async () => {
+      try {
+        console.log('🔍 Checking environment availability...')
+        const results = await checkAllEnvironmentsAvailability()
+        envAvailability.value = results
+        availabilityChecked.value = true
+        console.log('✅ Availability check complete:', results)
+      } catch (error) {
+        console.error('❌ Failed to check availability:', error)
+        availabilityChecked.value = true
+      }
+    }
+
     const getDifficulty = (envId) => {
       return environmentConfig[envId]?.difficulty || 3
     }
@@ -378,8 +423,13 @@ export default {
 
     // 定期更换有趣事实
     let factInterval
+    let availabilityInterval
     onMounted(() => {
       loadEnvironments()
+      
+      // Check availability immediately and periodically
+      checkAvailability()
+      availabilityInterval = setInterval(checkAvailability, 30000) // Check every 30s
       
       factInterval = setInterval(() => {
         currentFactIndex.value = (currentFactIndex.value + 1) % funFacts.length
@@ -389,6 +439,9 @@ export default {
     onUnmounted(() => {
       if (factInterval) {
         clearInterval(factInterval)
+      }
+      if (availabilityInterval) {
+        clearInterval(availabilityInterval)
       }
     })
 
@@ -401,6 +454,8 @@ export default {
       helpVisible,
       currentFactIndex,
       funFacts,
+      envAvailability,
+      availabilityChecked,
       selectEnvironment,
       onCardHover,
       onCardLeave,
@@ -415,7 +470,10 @@ export default {
       getEstimatedTime,
       isNewEnvironment,
       getEnvironmentFacts,
-      getParticleStyle
+      getParticleStyle,
+      isEnvAvailable,
+      getAvailabilityStatus,
+      checkAvailability
     }
   }
 }
@@ -622,6 +680,75 @@ export default {
   opacity: 0.3;
   transform: translate(-50%, -50%);
   animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Availability indicator styles */
+.availability-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.6rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.availability-indicator.available {
+  background: rgba(39, 174, 96, 0.15);
+  color: #27ae60;
+  border: 1px solid rgba(39, 174, 96, 0.3);
+}
+
+.availability-indicator.unavailable {
+  background: rgba(231, 76, 60, 0.15);
+  color: #e74c3c;
+  border: 1px solid rgba(231, 76, 60, 0.3);
+}
+
+.availability-indicator.checking {
+  background: rgba(241, 196, 15, 0.15);
+  color: #f39c12;
+  border: 1px solid rgba(241, 196, 15, 0.3);
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.availability-indicator.available .status-dot {
+  background: #27ae60;
+  box-shadow: 0 0 6px rgba(39, 174, 96, 0.6);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.availability-indicator.unavailable .status-dot {
+  background: #e74c3c;
+}
+
+.availability-indicator.checking .status-dot {
+  background: #f39c12;
+  animation: statusBlink 1s ease-in-out infinite;
+}
+
+.status-text {
+  line-height: 1;
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 6px rgba(39, 174, 96, 0.6); }
+  50% { opacity: 0.7; box-shadow: 0 0 12px rgba(39, 174, 96, 0.8); }
+}
+
+@keyframes statusBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .difficulty-indicator {

@@ -6,7 +6,7 @@ import BaseEnvClient from '../../../shared/services/baseClient.js';
 
 class BabyAIClient extends BaseEnvClient {
   constructor() {
-    super('http://localhost:36002');
+    super('/api/babyai');  // Uses vite proxy
     console.log('🔨 BabyAIClient initialized');
   }
 

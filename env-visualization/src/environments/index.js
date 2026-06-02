@@ -147,6 +147,49 @@ export function isEnvironmentSupported(environmentId) {
   return getAvailableEnvironments().includes(environmentId)
 }
 
+/**
+ * Check if an environment server is available/running
+ * @param {string} environmentId - Environment identifier
+ * @returns {Promise<{available: boolean, message: string}>} Availability status
+ */
+export async function checkEnvironmentAvailability(environmentId) {
+  const clientLoader = getEnvironmentClient(environmentId)
+  if (!clientLoader) {
+    return { available: false, message: 'No client configured' }
+  }
+  
+  try {
+    const module = await clientLoader()
+    const ClientClass = module.default
+    const client = new ClientClass()
+    
+    if (typeof client.testConnection === 'function') {
+      const result = await client.testConnection()
+      return {
+        available: result.success || result.connected || false,
+        message: result.message || result.error || 'Unknown status'
+      }
+    }
+    
+    return { available: false, message: 'No connection test available' }
+  } catch (error) {
+    return { available: false, message: error.message || 'Connection failed' }
+  }
+}
+
+/**
+ * Check availability of all environments
+ * @returns {Promise<Object>} Map of environmentId to availability status
+ */
+export async function checkAllEnvironmentsAvailability() {
+  const results = {}
+  const checks = environmentList.map(async (env) => {
+    results[env.id] = await checkEnvironmentAvailability(env.id)
+  })
+  await Promise.all(checks)
+  return results
+}
+
 // Export default environment for fallback
 export const DEFAULT_ENVIRONMENT = 'textcraft'
 
@@ -160,5 +203,7 @@ export default {
   hasEnvironmentConfig,
   getAvailableEnvironments,
   isEnvironmentSupported,
+  checkEnvironmentAvailability,
+  checkAllEnvironmentsAvailability,
   DEFAULT_ENVIRONMENT
 }
