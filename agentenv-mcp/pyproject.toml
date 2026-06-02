@@ -1,0 +1,32 @@
+[project]
+name = "agentenv-mcp"
+version = "0.1.0"
+description = "AgentGym environment with MCP (Model Context Protocol) integration using FastMCP"
+authors = [{ name = "AgentGym Contributors" }]
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "pydantic>=2.0.0",
+    "fastmcp>=2.0.0",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+
+[project.scripts]
+agentenv-mcp = "agentenv_mcp.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[dependency-groups]
+dev = ["pytest>=7.4.0", "ruff>=0.1.0"]
