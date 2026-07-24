@@ -84,6 +84,17 @@ self-training failure is new in the broad sense.  Our target contribution is a
 controlled causal decomposition of \emph{update timing}, together with
 separate probes for error feedback and pattern erasure.
 
+\paragraph{Direct self-evolving-agent baselines.}
+SDAR combines GRPO with on-policy self-distillation from a
+privileged-context teacher and applies a detached, token-level positive-gap
+gate \citep{lu2026sdar}.  SEED distills hindsight skills from completed
+trajectories \citep{wu2026seed}, while OPID uses hierarchical episode- and
+step-level skills \citep{yang2026opid}.  These methods make agent
+self-distillation substantially more relevant than generic semi-supervised
+baselines.  They nevertheless update on the current policy's experience; our
+question is orthogonal: what happens when such experience internalization is
+repeated over a long, non-IID evolution horizon?
+
 \section{Failure Setting}
 \label{sec:setting}
 
@@ -185,6 +196,11 @@ confidence threshold, following pseudo-label selection defenses
 \item \textbf{Eager + replay}: mix each current wave with historical
 trajectories, following continual-learning replay
 \citep{yoo2024lpr} and growing-batch ReST \citep{gulcehre2023rest}.
+\item \textbf{SDAR-style gated eager}: adapt SDAR's detached positive-gap gate
+\citep{lu2026sdar} to our action-level policy.  For pseudo-target $\hat a$,
+$g=\sigma(\beta[\log q(\hat a\mid s)-\log\pi(\hat a\mid s)])$ is detached and
+multiplies cross-entropy.  This isolates SDAR's gating mechanism but is
+\emph{not} an exact reproduction of its token-level GRPO system.
 \item \textbf{Lazy}: freeze collection for six waves and then
 update on all collected pseudo-labels.
 \end{itemize}
@@ -259,11 +275,31 @@ Eager & $0.0\pm0.0$ & $95.3\pm2.5$ & $95.2\pm2.6$ & $19.6\pm8.6$\\
 Confident eager & $0.0\pm0.0$ & $93.6\pm1.7$ & $93.5\pm1.7$ & $12.2\pm3.9$\\
 Mean Teacher & $79.1\pm9.6$ & $30.3\pm9.1$ & $29.8\pm9.1$ & $11.3\pm4.4$\\
 Eager + replay & $24.3\pm4.0$ & $69.4\pm1.6$ & $69.3\pm1.6$ & $10.9\pm7.6$\\
+SDAR-style gate & $3.3\pm3.0$ & $88.3\pm4.0$ & $88.0\pm4.1$ & $41.0\pm15.4$\\
 Lazy & $\mathbf{79.6\pm0.8}$ & $\mathbf{29.9\pm2.9}$ &
 $\mathbf{29.8\pm2.9}$ & $\mathbf{6.4\pm4.9}$\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{Why SDAR-style gating does not replace lazy timing}
+
+The SDAR-style adaptation reaches only $3.3\%\pm3.0\%$ success and accumulates
+$88.3\%\pm4.0\%$ pseudo-label error.  This negative result should not be read
+as a leaderboard claim against full SDAR: our controlled policy has neither
+language tokens nor GRPO rewards nor a privileged skill-context teacher.
+Instead, it is a causal probe of the transferable mechanism.  A positive-gap
+gate controls \emph{how strongly} the learner fits each current target, but
+eager updates still change the collector after every wave.  Once a wrong
+pattern becomes confident, its target can retain substantial weight, affect
+later state visitation, and overwrite earlier patterns.
+
+Lazy changes the missing axis: \emph{when} learning is allowed to affect data
+collection.  Freezing the collector blocks within-window
+error$\rightarrow$data feedback, and pooling all waves makes minority and
+majority patterns co-present.  Thus SDAR-style gating and Lazy are conceptually
+orthogonal; a full Lazy-SDAR experiment on ALFWorld or WebShop is an important
+next step.
 
 \section{Limitations and Next Steps}
 
@@ -274,6 +310,9 @@ The replay baseline receives additional historical examples, so it is
 data-reuse matched rather than optimizer-step matched.  Our next experiment
 should preserve the same frozen-window intervention in ALFWorld, WebShop, or a
 comparable language-agent environment.
+The SDAR row is a mechanism adaptation rather than an exact reproduction; a
+fair external comparison requires the authors' GRPO stack, language-model
+teacher, and original ALFWorld/SearchQA/WebShop protocols.
 
 \section{Conclusion}
 

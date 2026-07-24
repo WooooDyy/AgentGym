@@ -62,6 +62,7 @@ Mean ± sample standard deviation across three seeds:
 | Confidence-filtered eager | 0.0 ± 0.0 | 93.6 ± 1.7 | 93.5 ± 1.7 | 12.2 ± 3.9 |
 | Mean Teacher | 79.1 ± 9.6 | 30.3 ± 9.1 | 29.8 ± 9.1 | 11.3 ± 4.4 |
 | Eager + replay | 24.3 ± 4.0 | 69.4 ± 1.6 | 69.3 ± 1.6 | 10.9 ± 7.6 |
+| SDAR-style positive-gap gate | 3.3 ± 3.0 | 88.3 ± 4.0 | 88.0 ± 4.1 | 41.0 ± 15.4 |
 | **Lazy Distillation** | **79.6 ± 0.8** | **29.9 ± 2.9** | **29.8 ± 2.9** | **6.4 ± 4.9** |
 
 At twice the horizon and twice the number of evolution cycles, Lazy remains
@@ -69,6 +70,13 @@ stable across seeds. Mean Teacher is competitive on final success, but Lazy has
 lower pattern loss. Eager and confidence-filtered eager both collapse to zero,
 showing that confidence filtering alone does not break the recursive feedback
 loop.
+
+We also adapt SDAR's detached positive-gap gate to the action-level eager
+learner. This is a mechanism baseline, not an exact reproduction of SDAR's
+token-level GRPO system. It collapses in the long-horizon stress test: a gate
+changes how strongly the model learns a current pseudo-target, but does not
+stop each eager update from changing the next wave's collector. Lazy addresses
+the missing temporal axis by freezing collection and pooling waves.
 
 ## Interpretation
 
@@ -114,10 +122,14 @@ confirmation bias and pattern loss.
 8. Dou et al. *Re-ReST*. arXiv:2406.01495, 2024.
 9. Chen et al. *Rethinking Continual Experience Internalization for Self-Evolving LLM Agents*. arXiv:2606.04703, 2026.
 10. Shenfeld et al. *Self-Distillation Enables Continual Learning*. arXiv:2601.19897, 2026.
+11. Lu et al. *Self-Distilled Agentic Reinforcement Learning*. arXiv:2605.15155, 2026.
+12. Wu et al. *SEED: Self-Evolving On-Policy Distillation for Agentic Reinforcement Learning*. arXiv:2607.14777, 2026.
+13. Yang et al. *OPID: On-Policy Skill Distillation for Agentic Reinforcement Learning*. arXiv:2606.26790, 2026.
 
 ## Limitations
 
 This is a procedural stress test with a lightweight policy and simulator oracle.
 It provides causal diagnosis, not external validity on a real LLM agent
 benchmark. Exact reproductions on ALFWorld, WebShop, or an equivalent long
-interactive environment remain future work.
+interactive environment remain future work. The SDAR-style row isolates its
+gate only and must not be interpreted as a full SDAR reproduction.

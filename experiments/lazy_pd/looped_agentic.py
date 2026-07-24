@@ -61,11 +61,12 @@ class Config:
     confidence_threshold: float = 0.70
     ema_decay: float = 0.99
     replay_ratio: float = 1.0
+    sdar_gate_beta: float = 5.0
     seed_patterns: int = 12
     seed_examples_per_pattern: int = 12
     methods: tuple[str, ...] = (
         "frozen", "eager", "eager_confident", "mean_teacher",
-        "eager_replay", "lazy", "lazy_gated",
+        "eager_replay", "sdar_style", "lazy", "lazy_gated",
     )
     seed: int = 17
     device: str = "cuda"
@@ -172,6 +173,7 @@ def dataset_batches(
         yield (
             torch.from_numpy(np.stack([x[0] for x in selected])),
             torch.tensor([x[1] for x in selected], dtype=torch.long),
+            torch.tensor([x[2] for x in selected], dtype=torch.float32),
         )
 
 
@@ -181,6 +183,7 @@ def train(
     config: Config,
     seed: int,
     epochs: int,
+    sdar_gate_beta: float | None = None,
 ) -> dict:
     if not rows:
         return {"steps": 0, "examples": 0}
@@ -188,9 +191,28 @@ def train(
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.learning_rate)
     losses = []
     for epoch in range(epochs):
-        for x, y in dataset_batches(rows, config.batch_size, seed + epoch):
+        for x, y, teacher_confidence in dataset_batches(
+            rows, config.batch_size, seed + epoch
+        ):
             logits = model(x.to(config.device))
-            loss = F.cross_entropy(logits, y.to(config.device))
+            targets = y.to(config.device)
+            per_example = F.cross_entropy(logits, targets, reduction="none")
+            if sdar_gate_beta is not None:
+                # Controlled adaptation of SDAR's detached positive-gap gate:
+                # q supplies the privileged teacher probability of the selected
+                # pseudo action, while pi is the current student's probability.
+                student_logp = F.log_softmax(logits, -1).gather(
+                    1, targets[:, None]
+                ).squeeze(1)
+                teacher_logp = teacher_confidence.to(config.device).clamp_min(
+                    1e-8
+                ).log()
+                gate = torch.sigmoid(
+                    sdar_gate_beta * (teacher_logp - student_logp.detach())
+                )
+                loss = (gate * per_example).mean()
+            else:
+                loss = per_example.mean()
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -531,6 +553,13 @@ def run_method(
                         target.mul_(config.ema_decay).add_(
                             source, alpha=1.0 - config.ema_decay
                         )
+            elif method == "sdar_style":
+                update = train(
+                    model, rows, config,
+                    config.seed + cycle * config.waves + wave_id,
+                    config.update_epochs,
+                    sdar_gate_beta=config.sdar_gate_beta,
+                )
             elif method == "eager_replay":
                 replay_count = min(
                     len(replay_buffer), round(len(rows) * config.replay_ratio)
@@ -620,6 +649,7 @@ def parse_args() -> Config:
     for name in (
         "verifier_weight", "verifier_noise", "label_temperature",
         "learning_rate", "confidence_threshold", "ema_decay", "replay_ratio",
+        "sdar_gate_beta",
     ):
         parser.add_argument(
             "--" + name.replace("_", "-"), type=float, default=getattr(Config, name)
@@ -628,7 +658,7 @@ def parse_args() -> Config:
         "--methods", nargs="+",
         choices=(
             "frozen", "eager", "eager_confident", "mean_teacher",
-            "eager_replay", "lazy", "lazy_gated",
+            "eager_replay", "sdar_style", "lazy", "lazy_gated",
         ),
         default=list(Config.methods),
     )
