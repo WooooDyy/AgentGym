@@ -10,14 +10,16 @@
 \usepackage{array}
 \usepackage{multirow}
 \usepackage{natbib}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
 \hypersetup{colorlinks=true,citecolor=blue,urlcolor=blue,linkcolor=blue}
 \newcommand{\method}{\textsc{LazyDistill}}
 \newcommand{\cbias}{\textsc{ConfirmBias}}
 \newcommand{\ploss}{\textsc{PatternLoss}}
 \newcolumntype{Y}{>{\centering\arraybackslash}p{1.42cm}}
 
-\title{\textbf{Lazy Distillation for Long-Horizon Self-Evolving Agents}\\
-\large Breaking Confirmation-Bias Feedback Loops while Preserving Workflow Patterns}
+\title{\textbf{When Self-Evolving Agents Learn Too Soon}\\
+\large Lazy Distillation Breaks Confirmation-Bias Loops and Preserves Workflow Patterns}
 \author{Anonymous preliminary report}
 \date{July 2026}
 
@@ -25,38 +27,40 @@
 \maketitle
 
 \begin{abstract}
-Self-evolving agents repeatedly collect multi-step trajectories, construct
-pseudo-targets from their own policy and environment feedback, and internalize
-those targets through parameter updates.  This creates a feedback loop that is
-absent in one-shot distillation: an early error changes the policy, the changed
-policy visits different states, and those states supply the next training set.
-We isolate two coupled long-horizon failures: \emph{confirmation bias}, in
-which a wrong policy action becomes its own pseudo-label, and \emph{pattern
-loss}, in which sequential non-IID updates overwrite previously acquired
-minority workflows.  We propose \method{}, which freezes the trajectory
-collector for a multi-wave window and performs one pooled update.  In an
-8-step, 12-cycle controlled agent benchmark,
-\method{} obtains $74.0\%\pm17.8\%$ episode success while vanilla eager
-self-distillation collapses to $0\%$.  Against confidence filtering, Mean
-Teacher, and replay, \method{} yields the lowest pattern loss
-($3.6\%\pm3.1\%$).  At 16 steps and 24 cycles, Lazy retains
-$79.6\%\pm0.8\%$ success and $6.4\%\pm4.9\%$ pattern loss, while eager
-self-distillation again collapses to zero success.  These results are
-preliminary: the benchmark is procedural and the policy is lightweight, so
-external validation on language-agent environments remains necessary.
+Self-evolving agents train on experience produced by their own current policy.
+Over many train--collect loops, this creates two coupled failures: a wrong
+action can become its own training target (\emph{confirmation bias}), and
+learning the latest task mixture can erase previously successful workflows
+(\emph{pattern loss}).  Existing confidence gates, teacher averaging, and
+replay control target quality or memory, but they do not remove the immediate
+policy-update$\rightarrow$next-data feedback edge.  We propose \method{}, a
+change in learning time: keep the collector frozen for several non-IID waves,
+then train once on their pooled evidence.  We construct a controlled benchmark
+of 24 confusable tool-use workflows and expose agents for up to 24 repeated
+self-evolution cycles.  Simulator oracle actions let us directly measure the
+fraction of wrong pseudo-targets, while peak-to-final per-workflow success
+measures pattern loss.  At 16 steps and 24 cycles, eager and SDAR-style gated
+distillation obtain $0.0\%$ and $3.3\%$ success; \method{} obtains
+$79.6\%\pm0.8\%$, reduces pseudo-label error from $95.3\%$ (eager) to
+$29.9\%$, and limits pattern loss to $6.4\%$.  The evidence is controlled
+rather than a full LLM-agent reproduction, but it identifies update timing as
+a causal axis that existing self-distillation objectives leave open.
 \end{abstract}
 
-\section{Motivation}
-\label{sec:motivation}
+\section{Introduction}
+\label{sec:introduction}
 
-Language agents can improve from their own interaction traces without requiring
-a stronger teacher for every action.  STaR filters self-generated rationales
-\citep{zelikman2022star}; ReST reuses offline model samples
-\citep{gulcehre2023rest}; ReST-meets-ReAct extends this idea to multi-step agents
-\citep{aksitov2023restreact}; and Re-ReST repairs weak trajectories using
-environment feedback \citep{dou2024rerest}.  However, most headline evaluations
-use one or a few improvement rounds.  A genuinely self-evolving agent runs the
-following loop many times:
+Self-evolution asks an agent to turn its own interaction history into better
+future behavior.  A current policy collects multi-step trajectories, converts
+them into pseudo-supervision using feedback or hindsight, updates its
+parameters, and repeats.  This paradigm underlies agent self-training methods
+such as ReST-meets-ReAct and Re-ReST
+\citep{aksitov2023restreact,dou2024rerest}, and recent agentic RL methods such
+as SDAR, OPID, and SEED \citep{lu2026sdar,yang2026opid,wu2026seed}.
+
+The long-horizon setting is different from ordinary one-shot
+self-distillation because the learner also controls its next training
+distribution.  A genuinely self-evolving agent runs
 \begin{equation}
  \pi_k \longrightarrow \mathcal{D}_k(\pi_k)
  \longrightarrow \widehat{\mathcal{D}}_k
@@ -66,34 +70,118 @@ following loop many times:
 where the current policy $\pi_k$ determines the trajectory distribution
 $\mathcal{D}_k$, and therefore determines its own future supervision.
 
-Our central premise is deliberately narrow: \textbf{confirmation bias and
-pattern loss become a coupled agent failure under long-horizon, repeated
-self-evolution}.  In one-shot distillation there is no recursive
-$\pi_{k+1}\!\rightarrow\!\mathcal{D}_{k+1}$ contamination.  In long-horizon
-interaction, a single wrong action can move the agent into a different state
-subtree; immediate learning can then make that subtree more likely in every
-later round.
+This closed loop couples two known learning problems into one agent failure.
+Pseudo-labeling research calls the first problem \emph{confirmation bias}: an
+incorrect model prediction is reused as a label and becomes more confident
+\citep{arazo2020confirmation,rodemann2023bayes}.  Continual-learning research
+calls the second broad problem \emph{catastrophic forgetting}: later non-IID
+updates damage older capabilities \citep{luo2023forgetting}.  We use
+\emph{pattern loss} for a precise agent-level measurement of that second
+problem: how much full-workflow success falls from its best observed value to
+its final value.  Neither term is claimed as new; the new question is why they
+reinforce each other over many policy-controlled collection loops.
 
-\paragraph{Closest concurrent evidence.}
-\citet{chen2026internalization} independently report progressive capability
-collapse under multi-iteration experience internalization and find stable
-off-policy context distillation preferable to on-policy internalization.
-\citet{shenfeld2026sdft} show that demonstration-conditioned self-distillation
-can reduce continual forgetting.  We therefore do not claim that iterative
-self-training failure is new in the broad sense.  Our target contribution is a
-controlled causal decomposition of \emph{update timing}, together with
-separate probes for error feedback and pattern erasure.
+Existing defenses leave the temporal feedback edge intact.  Confidence
+filtering rejects low-confidence labels but fails when the agent is confidently
+wrong.  Mean Teacher smooths targets but still updates after each non-IID wave.
+Replay retains old examples but may retain old mistakes.  SDAR's positive-gap
+gate improves dense token supervision within agentic RL
+\citep{lu2026sdar}, yet it also controls loss weight rather than the time at
+which a learned policy changes future collection.  Concurrent evidence indeed
+finds progressive collapse under multi-iteration agent experience
+internalization and favors stable off-policy signals
+\citep{chen2026internalization}.
 
-\paragraph{Direct self-evolving-agent baselines.}
-SDAR combines GRPO with on-policy self-distillation from a
-privileged-context teacher and applies a detached, token-level positive-gap
-gate \citep{lu2026sdar}.  SEED distills hindsight skills from completed
-trajectories \citep{wu2026seed}, while OPID uses hierarchical episode- and
-step-level skills \citep{yang2026opid}.  These methods make agent
-self-distillation substantially more relevant than generic semi-supervised
-baselines.  They nevertheless update on the current policy's experience; our
-question is orthogonal: what happens when such experience internalization is
-repeated over a long, non-IID evolution horizon?
+Our solution is to make learning \emph{lazy}, not weak.  As
+Figure~\ref{fig:idea} illustrates, \method{} freezes the collector across a
+window of different workflow waves and performs one update on their union.
+Freezing blocks an early mistake from changing later data in the same window;
+pooling makes old, new, common, and rare patterns compete in the same
+optimization event.  The method therefore targets the causes of both failures
+without requiring an oracle at training time.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  node distance=3.5mm and 5mm,
+  box/.style={draw,rounded corners=1.5pt,minimum height=6mm,align=center,font=\scriptsize},
+  arr/.style={-{Latex[length=2mm]},thick},
+  bad/.style={draw=red!70,fill=red!5},
+  good/.style={draw=teal!70!black,fill=teal!6}
+]
+\node[font=\small\bfseries] (eager) {Eager: every wave changes the next collector};
+\node[box,bad,below=of eager] (p0) {$\pi_k$};
+\node[box,bad,right=of p0] (d1) {wave 1\\data};
+\node[box,bad,right=of d1] (p1) {update\\$\pi_{k,1}$};
+\node[box,bad,right=of p1] (d2) {wave 2\\changed data};
+\node[box,bad,right=of d2] (p2) {update};
+\draw[arr,red!70] (p0)--(d1);
+\draw[arr,red!70] (d1)-- node[above,font=\tiny]{fit error} (p1);
+\draw[arr,red!70] (p1)-- node[above,font=\tiny]{feedback} (d2);
+\draw[arr,red!70] (d2)--(p2);
+
+\node[font=\small\bfseries,below=9mm of p0.south west,anchor=west] (lazy)
+  {Lazy: freeze collection, then learn once from pooled patterns};
+\node[box,good,below=of lazy] (q0) {frozen\\$\bar\pi_j$};
+\node[box,good,right=of q0] (b1) {wave 1};
+\node[box,good,right=of b1] (b2) {wave 2};
+\node[box,good,right=of b2] (pool) {pooled\\buffer};
+\node[box,good,right=of pool] (q1) {one update\\$\pi_{j+1}$};
+\draw[arr,teal!70!black] (q0)--(b1);
+\draw[arr,teal!70!black] (q0) to[bend left=17] (b2);
+\draw[arr,teal!70!black] (b1)--(pool);
+\draw[arr,teal!70!black] (b2)--(pool);
+\draw[arr,teal!70!black] (pool)--(q1);
+\end{tikzpicture}
+\caption{\textbf{The intervention changes when learning affects future data.}
+Eager updates create a short feedback loop; Lazy freezes the collector so
+errors cannot alter later waves inside the window, then jointly optimizes all
+observed patterns.}
+\label{fig:idea}
+\end{figure}
+
+Our controlled study makes three contributions.  First, it defines
+agent-observable probes that separately measure wrong-target feedback and
+workflow erasure.  Second, it provides a procedural long-horizon benchmark in
+which the oracle is used only for diagnosis, not training.  Third, across
+generic defenses and an SDAR-style gate, it shows that update timing is the
+only tested intervention that simultaneously maintains task success, low
+pseudo-label error, and low pattern loss.
+
+\section{Related Work and the Missing Axis}
+
+\paragraph{Confirmation bias in self-training.}
+Confirmation bias was explicitly studied in deep pseudo-labeling by
+\citet{arazo2020confirmation}: incorrect predictions can be selected as labels
+and reinforced.  Confidence selection and Bayesian selection reduce exposure
+to uncertain targets \citep{radhakrishnan2023enhancing,rodemann2023bayes}.
+These methods address which examples enter an update.  In our setting, however,
+an error can become highly confident and the update changes which states the
+agent visits next; example filtering does not break that temporal edge.
+
+\paragraph{Forgetting under sequential learning.}
+Catastrophic forgetting is the degradation of earlier capabilities while
+learning later tasks, and it has been observed during continual LLM
+fine-tuning \citep{luo2023forgetting}.  Replay and teacher-based consistency
+are standard defenses \citep{tarvainen2017mean,yoo2024lpr}, while recent
+self-distillation fine-tuning reduces forgetting when learning from
+demonstrations \citep{shenfeld2026sdft}.  These methods preserve parameters or
+examples.  Pattern loss instead tests an agent-specific outcome---whether a
+previously solved multi-step workflow is no longer solved after later
+self-generated updates.
+
+\paragraph{Self-improving and self-evolving agents.}
+STaR, ReST, ReST-meets-ReAct, and Re-ReST train from generated or repaired
+reasoning traces \citep{zelikman2022star,gulcehre2023rest,
+aksitov2023restreact,dou2024rerest}.  SDAR uses a privileged-context teacher
+and a detached positive-gap gate; OPID and SEED distill hindsight skills from
+on-policy trajectories \citep{lu2026sdar,yang2026opid,wu2026seed}.  These
+papers improve supervision within an optimization round, but do not isolate
+the causal effect of update frequency across many non-IID rounds.  The closest
+concurrent work reports multi-iteration capability collapse
+\citep{chen2026internalization}; our distinction is a controlled intervention
+on update timing plus separate measurements of error reinforcement and
+workflow erasure.
 
 \section{Failure Setting}
 \label{sec:setting}
@@ -128,6 +216,13 @@ We additionally track normalized pseudo-action entropy.  Falling entropy
 together with rising self-reinforced error distinguishes collapse from merely
 hard data.
 
+In plain language, pseudo-label error asks ``was the training answer wrong?''
+and self-reinforcement asks the stricter question ``did the agent copy its own
+wrong answer into the training set?''  For example, if the correct tool is
+\texttt{search}, the policy chooses \texttt{click}, and the constructed target
+is also \texttt{click}, the state counts toward both metrics.  If the verifier
+repairs the target to \texttt{search}, it counts toward neither.
+
 \subsection{Probing pattern loss}
 
 Workflows arrive in non-IID waves.  For pattern $p$, let $k_p$ be its first
@@ -138,6 +233,30 @@ exposure and $S_{p,k}$ its full-episode success after update $k$.  We define
 This asks whether the agent \emph{previously knew} a workflow and lost it after
 later self-evolution.  Frozen has zero pattern loss mechanically because it
 never updates; it is an ability anchor, not a continual-learning solution.
+
+\begin{table}[t]
+\centering
+\small
+\caption{\textbf{The two pitfalls are measured at different levels.}  Oracle
+actions are available to the evaluator only; training receives policy
+probabilities and weak verifier feedback.}
+\label{tab:metrics}
+\begin{tabular}{p{2.5cm}p{5.0cm}p{5.0cm}}
+\toprule
+Metric & What is counted & What a high value means\\
+\midrule
+Pseudo-label error &
+$\hat a\neq a^\star$, averaged over collected decision states &
+The agent is manufacturing incorrect supervision.\\
+Self-reinforced error &
+The greedy policy action is wrong and the pseudo-label copies that exact action &
+The model's own error is directly fed back as a target.\\
+Pattern loss &
+For each workflow, best post-exposure episode success minus final success &
+A workflow was acquired and later erased; this is not merely failure to learn.\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 \section{Lazy Distillation}
 \label{sec:method}
@@ -182,6 +301,48 @@ The main setting uses $H=8$, three attempts per stage, six waves, 12 evolution
 cycles, and five seeds.  The scale setting uses $H=16$, 24 evolution cycles,
 and three seeds.  Every method starts from the same warm-start policy and sees
 the same schedule.  Results report mean and sample standard deviation.
+
+\begin{table}[t]
+\centering
+\small
+\caption{\textbf{Controlled dataset and protocol.}  The scale setting changes
+only the two axes central to our hypothesis: episode horizon and number of
+self-evolution cycles.}
+\label{tab:dataset}
+\begin{tabular}{p{4.0cm}ccp{5.0cm}}
+\toprule
+Property & Main & Scale & Purpose\\
+\midrule
+Workflow patterns & 24 & 24 & 12 common/rare confusable pairs\\
+Actions (tools) & 8 & 8 & Discrete action choice at each state\\
+Dependent steps per episode & 8 & 16 & A wrong step changes later observations\\
+Attempts allowed per step & 3 & 3 & Environment feedback permits local recovery\\
+Non-IID waves per cycle & 6 & 6 & Different pattern subsets arrive sequentially\\
+Self-evolution cycles & 12 & 24 & Repeated collect--label--update loops\\
+Training tasks per active pattern & 24 & 24 & Identical data budget across methods\\
+Evaluation tasks per pattern & 32 & 32 & Full evaluation of all 24 patterns\\
+Random seeds & 5 & 3 & Mean and sample standard deviation\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{What one episode looks like.}
+A workflow is a hidden length-$H$ program over eight tool actions.  At every
+step, the policy observes a 24-dimensional workflow cue, current program
+position, previous action, and success/failure feedback.  Confusable pair
+members share similar cues but disagree on half of their correct actions.
+Thus memorizing the dominant member harms its rare partner.  The full episode
+succeeds only if the agent completes all $H$ dependent stages within three
+attempts per stage, making the scale setting genuinely long-horizon rather than
+16 independent classification examples.
+
+\paragraph{How non-IID evolution is induced.}
+Each cycle contains six waves, and each wave activates a subset of patterns.
+Later cycles oversample common members while rare members appear less often.
+All methods receive the exact same wave order and warm-start state.  This
+schedule creates the two necessary stressors without hard-coding failure:
+self-generated labels can recursively change, and sequentially dominant
+patterns can overwrite rare ones.
 
 \subsection{Comparison methods}
 
@@ -281,6 +442,17 @@ $\mathbf{29.8\pm2.9}$ & $\mathbf{6.4\pm4.9}$\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/long_horizon_dynamics.pdf}
+\caption{\textbf{Failures emerge over repeated loops, not from one difficult
+batch.} Mean $\pm$ one standard deviation across three seeds in the 16-step,
+24-cycle setting. Eager and SDAR-style learning rapidly approach near-total
+pseudo-label error and lose task ability. Lazy remains stable and has the
+lowest pattern loss among updating methods.}
+\label{fig:dynamics}
+\end{figure}
 
 \subsection{Why SDAR-style gating does not replace lazy timing}
 

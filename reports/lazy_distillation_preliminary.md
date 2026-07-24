@@ -17,6 +17,8 @@ pseudo-label, change the policy, and contaminate later experience. Lazy
 Distillation freezes the trajectory collector for a multi-wave window and
 updates once on the pooled evidence.
 
+![Long-horizon dynamics](figures/long_horizon_dynamics.png)
+
 - Confirmation bias is reduced because an update cannot contaminate later
   trajectories inside the same collection window.
 - Pattern loss is reduced because common and rare workflow patterns are present
@@ -34,6 +36,36 @@ We measure confirmation bias using simulator oracle actions. A
 `self-reinforced error` occurs when the policy's greedy action is wrong and its
 pseudo-label repeats that same wrong action. Pattern loss is the difference
 between a pattern's best post-exposure episode success and its final success.
+
+### What exactly is measured?
+
+| Diagnostic | Definition | Plain-language meaning |
+|---|---|---|
+| Pseudo-label error | Fraction of collected states where the pseudo-target differs from the hidden oracle action | “Was the training answer wrong?” |
+| Self-reinforced error | Greedy action is wrong and the pseudo-target copies that same action | “Did the model feed its own mistake back as supervision?” |
+| Pattern loss | Per workflow: best post-exposure episode success minus final success | “Could the agent solve this workflow before, but lose it later?” |
+
+The oracle is used only by the evaluator. It is not exposed to any training
+method.
+
+### Dataset and protocol
+
+| Property | Main | Scale |
+|---|---:|---:|
+| Workflow patterns | 24 (12 confusable common/rare pairs) | same |
+| Discrete tools/actions | 8 | 8 |
+| Dependent steps per episode | 8 | 16 |
+| Attempts per step | 3 | 3 |
+| Non-IID waves per cycle | 6 | 6 |
+| Self-evolution cycles | 12 | 24 |
+| Training tasks per active pattern | 24 | 24 |
+| Evaluation tasks per pattern | 32 | 32 |
+| Seeds | 5 | 3 |
+
+Each pattern is a hidden multi-step tool program. Confusable pair members have
+similar observation cues but disagree on half of their correct actions. Later
+cycles oversample common members, so a sequential learner can overwrite rare
+workflows. Full-episode success requires completing every dependent stage.
 
 ## Main result: 8 steps × 12 cycles
 
@@ -109,6 +141,13 @@ collapse under multi-iteration experience learning and favors stable
 off-policy context distillation. Our narrower preliminary contribution is the
 controlled isolation of update timing and the paired, per-cycle diagnosis of
 confirmation bias and pattern loss.
+
+The names of the broad pitfalls are not new. Arazo et al. (2020) explicitly
+studied confirmation bias in pseudo-labeling, and continual-learning work calls
+the loss of older capabilities catastrophic forgetting. “Pattern loss” is our
+agent-level operationalization: peak-to-final success for each complete
+workflow. Our claimed gap is their coupling across many policy-controlled
+collection loops and the causal role of update timing.
 
 ## References
 
