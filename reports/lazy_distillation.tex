@@ -12,7 +12,37 @@
 \usepackage{natbib}
 \usepackage{tikz}
 \usetikzlibrary{arrows.meta,positioning,fit,backgrounds}
+\usepackage{tabularx}
+\usepackage[most]{tcolorbox}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{caption}
+\usepackage{colortbl}
 \hypersetup{colorlinks=true,citecolor=blue,urlcolor=blue,linkcolor=blue}
+\definecolor{paperNavy}{HTML}{17324D}
+\definecolor{paperTeal}{HTML}{168C80}
+\definecolor{paperOrange}{HTML}{D96C24}
+\definecolor{paperBlue}{HTML}{2C6EAA}
+\definecolor{paperLight}{HTML}{F3F7FA}
+\titleformat{\section}{\Large\bfseries\color{paperNavy}}{\thesection}{0.65em}{}
+\titleformat{\subsection}{\large\bfseries\color{paperNavy}}{\thesubsection}{0.55em}{}
+\captionsetup{font=small,labelfont={bf,color=paperNavy}}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\scriptsize\color{paperNavy}\textsc{Lazy Distillation}}
+\fancyhead[R]{\scriptsize\color{gray}Preliminary controlled study}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.35pt}
+\newtcolorbox{storybox}[1]{
+  enhanced,breakable,colback=paperLight,colframe=paperNavy,
+  boxrule=0.55pt,arc=2pt,left=6pt,right=6pt,top=5pt,bottom=5pt,
+  title={#1},fonttitle=\bfseries,coltitle=white,colbacktitle=paperNavy
+}
+\newcommand{\takeaway}[1]{%
+\begin{tcolorbox}[colback=paperTeal!6,colframe=paperTeal,
+  boxrule=0.5pt,arc=2pt,left=5pt,right=5pt,top=3pt,bottom=3pt]
+\small\textbf{\color{paperTeal}Takeaway.} #1
+\end{tcolorbox}}
 \newcommand{\method}{\textsc{LazyDistill}}
 \newcommand{\cbias}{\textsc{ConfirmBias}}
 \newcommand{\ploss}{\textsc{PatternLoss}}
@@ -46,6 +76,22 @@ $29.9\%$, and limits pattern loss to $6.4\%$.  The evidence is controlled
 rather than a full LLM-agent reproduction, but it identifies update timing as
 a causal axis that existing self-distillation objectives leave open.
 \end{abstract}
+
+\begin{storybox}{Paper at a glance}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{paperNavy}}p{2.05cm}X}
+Question & Why do agents that repeatedly learn from their own trajectories
+collapse even when each individual update appears reasonable?\\[2pt]
+Diagnosis & Eager updates couple two failures: wrong actions become future
+targets (\emph{confirmation bias}), while the latest non-IID wave overwrites
+previously solved workflows (\emph{pattern loss}).\\[2pt]
+Intervention & Freeze the collector across several waves, pool their evidence,
+and update once.  This removes within-window error feedback and makes
+common/rare patterns co-present during optimization.\\[2pt]
+Headline evidence & At 16 steps and 24 cycles, Eager reaches $0.0\%$ success
+and SDAR-style gating reaches $3.3\%$; Lazy retains $79.6\%\pm0.8\%$ with
+$6.4\%$ pattern loss.
+\end{tabularx}
+\end{storybox}
 
 \section{Introduction}
 \label{sec:introduction}
@@ -186,6 +232,32 @@ workflow erasure.
 \section{Failure Setting}
 \label{sec:setting}
 
+The failure can be understood through one concrete tool-use example.  Consider
+two visually similar workflows, one requiring
+\texttt{search$\rightarrow$open$\rightarrow$extract} and a rarer one requiring
+\texttt{search$\rightarrow$filter$\rightarrow$extract}.  If an eager agent
+mistakes \texttt{open} for \texttt{filter}, its own pseudo-target may approve
+\texttt{open}; the update then makes \texttt{open} more likely in later
+collections.  As common examples dominate later waves, the rare
+\texttt{filter} workflow can fall from previously solved to consistently
+failed.  Confirmation bias describes the wrong target; pattern loss describes
+the lost end-to-end workflow.
+
+\begin{storybox}{Running example: one error, two long-horizon consequences}
+\begin{tabularx}{\textwidth}{p{1.15cm}Xp{3.6cm}}
+\toprule
+Time & Event in the self-evolution loop & Diagnostic consequence\\
+\midrule
+$k$ & Agent chooses wrong \texttt{open}; its pseudo-target copies
+\texttt{open}. & A self-reinforced error enters training.\\
+$k+1$ & The updated policy visits states caused by \texttt{open} more often. &
+Confirmation bias grows across collection rounds.\\
+$k+m$ & Common \texttt{open} workflows dominate; rare \texttt{filter}
+examples are overwritten. & Previously acquired workflow success is lost.\\
+\bottomrule
+\end{tabularx}
+\end{storybox}
+
 An episode is a partially observed workflow with horizon $H$.  At state $s_t$,
 the policy selects one of eight tools.  The hidden workflow program defines the
 oracle action $a_t^\star$.  A weak hindsight verifier and the policy distribution
@@ -261,7 +333,10 @@ A workflow was acquired and later erased; this is not merely failure to learn.\\
 \section{Lazy Distillation}
 \label{sec:method}
 
-\method{} separates collection time from internalization time.  For a window of
+\method{} separates collection time from internalization time.  The method has
+two deliberately simple modules: a \emph{frozen collection window} that blocks
+fast error feedback and a \emph{pooled update} that jointly rehearses every
+pattern observed in that window.  For a window of
 $W$ non-IID waves, it holds the collector fixed at $\bar\pi_j$:
 \begin{equation}
  \mathcal{B}_j=\bigcup_{w=1}^{W}
@@ -269,10 +344,22 @@ $W$ non-IID waves, it holds the collector fixed at $\bar\pi_j$:
 \end{equation}
 Only after all waves arrive does it update on the pooled buffer:
 \begin{equation}
- \pi_{j+1}=\arg\min_\pi
+\pi_{j+1}=\arg\min_\pi
  \sum_{x\in\mathcal{B}_j}
  \ell\!\left(\pi(\cdot\mid s_x),\hat a_x\right).
 \end{equation}
+
+\begin{storybox}{LazyDistill in four steps}
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt,topsep=1pt]
+\item Snapshot the current agent as the frozen collector $\bar\pi_j$.
+\item Collect $W$ non-IID waves with the same $\bar\pi_j$; do not update between
+waves.
+\item Construct pseudo-targets with policy probabilities and weak verifier
+feedback, then pool all waves into $\mathcal{B}_j$.
+\item Train once on $\mathcal{B}_j$ to obtain $\pi_{j+1}$ and begin the next
+window.
+\end{enumerate}
+\end{storybox}
 \paragraph{Why it targets confirmation bias.}
 Within a window, an early wrong update cannot change later trajectories because
 there is no within-window update.  The loop gain of
@@ -372,6 +459,17 @@ claimed as exact reproductions on the original datasets.
 \section{Preliminary Results}
 \label{sec:results}
 
+\begin{storybox}{Evaluation logic}
+\begin{tabularx}{\textwidth}{>{\bfseries\color{paperNavy}}p{1.1cm}X}
+Q1 & Does repeated eager self-distillation actually create confirmation bias
+and pattern loss?\\
+Q2 & Do target filtering, teacher smoothing, replay, or delayed timing resolve
+both failures?\\
+Q3 & Does the distinction persist when both episode horizon and evolution
+depth are doubled?
+\end{tabularx}
+\end{storybox}
+
 \subsection{Does the long self-evolution failure exist?}
 
 Table~\ref{tab:main} first establishes the phenomenon.  Eager
@@ -392,15 +490,22 @@ Method & Success $\uparrow$ & Pseudo error $\downarrow$ &
 Self-reinforce $\downarrow$ & Pattern loss $\downarrow$\\
 \midrule
 Frozen & $35.8\pm5.9$ & $46.4\pm7.1$ & $44.9\pm7.2$ & $0.0\pm0.0$\\
+\rowcolor{paperOrange!7}
 Eager & $0.0\pm0.0$ & $94.4\pm1.2$ & $94.3\pm1.2$ & $39.6\pm9.7$\\
 Confident eager & $54.0\pm30.2$ & $56.8\pm17.2$ & $56.5\pm17.2$ & $26.8\pm14.4$\\
 Mean Teacher & $62.8\pm12.9$ & $49.0\pm8.1$ & $48.2\pm8.2$ & $24.3\pm9.3$\\
 Eager + replay & $56.6\pm9.3$ & $60.4\pm8.1$ & $60.2\pm8.1$ & $10.5\pm2.6$\\
+\rowcolor{paperTeal!10}
 Lazy (timing) & $\mathbf{74.0\pm17.8}$ & $\mathbf{43.2\pm12.5}$ &
 $\mathbf{43.0\pm12.5}$ & $\mathbf{3.6\pm3.1}$\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\takeaway{The first experiment establishes the phenomenon before evaluating
+the cure: eager learning converts a usable $35.8\%$ frozen policy into a
+$0\%$ policy, and $94.3\%$ of collected states directly reinforce the
+policy's own wrong action.}
 
 \subsection{Probing whether lazy learning addresses both failures}
 
@@ -432,16 +537,24 @@ Method & Success $\uparrow$ & Pseudo error $\downarrow$ &
 Self-reinforce $\downarrow$ & Pattern loss $\downarrow$\\
 \midrule
 Frozen & $52.9\pm3.5$ & $24.0\pm3.5$ & $21.9\pm3.5$ & $0.0\pm0.0$\\
+\rowcolor{paperOrange!7}
 Eager & $0.0\pm0.0$ & $95.3\pm2.5$ & $95.2\pm2.6$ & $19.6\pm8.6$\\
 Confident eager & $0.0\pm0.0$ & $93.6\pm1.7$ & $93.5\pm1.7$ & $12.2\pm3.9$\\
 Mean Teacher & $79.1\pm9.6$ & $30.3\pm9.1$ & $29.8\pm9.1$ & $11.3\pm4.4$\\
 Eager + replay & $24.3\pm4.0$ & $69.4\pm1.6$ & $69.3\pm1.6$ & $10.9\pm7.6$\\
+\rowcolor{paperOrange!7}
 SDAR-style gate & $3.3\pm3.0$ & $88.3\pm4.0$ & $88.0\pm4.1$ & $41.0\pm15.4$\\
+\rowcolor{paperTeal!10}
 Lazy & $\mathbf{79.6\pm0.8}$ & $\mathbf{29.9\pm2.9}$ &
 $\mathbf{29.8\pm2.9}$ & $\mathbf{6.4\pm4.9}$\\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\takeaway{Difficulty amplifies the distinction.  At twice the horizon and
+twice the evolution depth, Lazy and Mean Teacher preserve task ability, but
+Lazy retains workflows better; confidence gates, replay, and SDAR-style eager
+gating do not jointly control both failure metrics.}
 
 \begin{figure}[t]
 \centering
