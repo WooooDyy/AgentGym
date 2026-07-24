@@ -1,0 +1,290 @@
+\documentclass[10pt]{article}
+\usepackage[margin=0.78in]{geometry}
+\usepackage{booktabs}
+\usepackage{amsmath,amssymb}
+\usepackage{microtype}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{natbib}
+\hypersetup{colorlinks=true,citecolor=blue,urlcolor=blue,linkcolor=blue}
+\newcommand{\method}{\textsc{LazyDistill}}
+\newcommand{\cbias}{\textsc{ConfirmBias}}
+\newcommand{\ploss}{\textsc{PatternLoss}}
+\newcolumntype{Y}{>{\centering\arraybackslash}p{1.42cm}}
+
+\title{\textbf{Lazy Distillation for Long-Horizon Self-Evolving Agents}\\
+\large Breaking Confirmation-Bias Feedback Loops while Preserving Workflow Patterns}
+\author{Anonymous preliminary report}
+\date{July 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Self-evolving agents repeatedly collect multi-step trajectories, construct
+pseudo-targets from their own policy and environment feedback, and internalize
+those targets through parameter updates.  This creates a feedback loop that is
+absent in one-shot distillation: an early error changes the policy, the changed
+policy visits different states, and those states supply the next training set.
+We isolate two coupled long-horizon failures: \emph{confirmation bias}, in
+which a wrong policy action becomes its own pseudo-label, and \emph{pattern
+loss}, in which sequential non-IID updates overwrite previously acquired
+minority workflows.  We propose \method{}, which freezes the trajectory
+collector for a multi-wave window and performs one pooled update.  In an
+8-step, 12-cycle controlled agent benchmark,
+\method{} obtains $74.0\%\pm17.8\%$ episode success while vanilla eager
+self-distillation collapses to $0\%$.  Against confidence filtering, Mean
+Teacher, and replay, \method{} yields the lowest pattern loss
+($3.6\%\pm3.1\%$).  At 16 steps and 24 cycles, Lazy retains
+$79.6\%\pm0.8\%$ success and $6.4\%\pm4.9\%$ pattern loss, while eager
+self-distillation again collapses to zero success.  These results are
+preliminary: the benchmark is procedural and the policy is lightweight, so
+external validation on language-agent environments remains necessary.
+\end{abstract}
+
+\section{Motivation}
+\label{sec:motivation}
+
+Language agents can improve from their own interaction traces without requiring
+a stronger teacher for every action.  STaR filters self-generated rationales
+\citep{zelikman2022star}; ReST reuses offline model samples
+\citep{gulcehre2023rest}; ReST-meets-ReAct extends this idea to multi-step agents
+\citep{aksitov2023restreact}; and Re-ReST repairs weak trajectories using
+environment feedback \citep{dou2024rerest}.  However, most headline evaluations
+use one or a few improvement rounds.  A genuinely self-evolving agent runs the
+following loop many times:
+\begin{equation}
+ \pi_k \longrightarrow \mathcal{D}_k(\pi_k)
+ \longrightarrow \widehat{\mathcal{D}}_k
+ \longrightarrow \pi_{k+1},
+ \label{eq:loop}
+\end{equation}
+where the current policy $\pi_k$ determines the trajectory distribution
+$\mathcal{D}_k$, and therefore determines its own future supervision.
+
+Our central premise is deliberately narrow: \textbf{confirmation bias and
+pattern loss become a coupled agent failure under long-horizon, repeated
+self-evolution}.  In one-shot distillation there is no recursive
+$\pi_{k+1}\!\rightarrow\!\mathcal{D}_{k+1}$ contamination.  In long-horizon
+interaction, a single wrong action can move the agent into a different state
+subtree; immediate learning can then make that subtree more likely in every
+later round.
+
+\paragraph{Closest concurrent evidence.}
+\citet{chen2026internalization} independently report progressive capability
+collapse under multi-iteration experience internalization and find stable
+off-policy context distillation preferable to on-policy internalization.
+\citet{shenfeld2026sdft} show that demonstration-conditioned self-distillation
+can reduce continual forgetting.  We therefore do not claim that iterative
+self-training failure is new in the broad sense.  Our target contribution is a
+controlled causal decomposition of \emph{update timing}, together with
+separate probes for error feedback and pattern erasure.
+
+\section{Failure Setting}
+\label{sec:setting}
+
+An episode is a partially observed workflow with horizon $H$.  At state $s_t$,
+the policy selects one of eight tools.  The hidden workflow program defines the
+oracle action $a_t^\star$.  A weak hindsight verifier and the policy distribution
+form a pseudo-label:
+\begin{equation}
+ q_k(a\mid s)=(1-\lambda)\,
+ \mathrm{Sharpen}(\pi_k(a\mid s))+\lambda v(a\mid s),\qquad
+ \hat a=\arg\max_a q_k(a\mid s).
+\end{equation}
+The verifier is usually correct but deliberately too weak to override an
+already overconfident wrong policy.  This does not force confirmation bias:
+it creates the condition under which bias can either grow or be corrected.
+
+\subsection{Probing confirmation bias}
+
+Because the simulator hides an oracle action from the learner, we can diagnose
+pseudo-targets without changing training.  We report:
+\begin{align}
+\mathrm{PseudoErr}_k
+ &= \Pr[\hat a_k\neq a^\star],\\
+\mathrm{SelfReinforce}_k
+ &= \Pr[\arg\max_a\pi_k(a\mid s)\neq a^\star
+ \ \wedge\ \hat a_k=\arg\max_a\pi_k(a\mid s)],\\
+\mathrm{Amplification}
+ &= \mathrm{PseudoErr}_{K}-\mathrm{PseudoErr}_{1}.
+\end{align}
+We additionally track normalized pseudo-action entropy.  Falling entropy
+together with rising self-reinforced error distinguishes collapse from merely
+hard data.
+
+\subsection{Probing pattern loss}
+
+Workflows arrive in non-IID waves.  For pattern $p$, let $k_p$ be its first
+exposure and $S_{p,k}$ its full-episode success after update $k$.  We define
+\begin{equation}
+ \mathrm{\ploss}(p)=\max_{k\ge k_p} S_{p,k}-S_{p,K}.
+\end{equation}
+This asks whether the agent \emph{previously knew} a workflow and lost it after
+later self-evolution.  Frozen has zero pattern loss mechanically because it
+never updates; it is an ability anchor, not a continual-learning solution.
+
+\section{Lazy Distillation}
+\label{sec:method}
+
+\method{} separates collection time from internalization time.  For a window of
+$W$ non-IID waves, it holds the collector fixed at $\bar\pi_j$:
+\begin{equation}
+ \mathcal{B}_j=\bigcup_{w=1}^{W}
+ \widehat{\mathcal{D}}_{j,w}(\bar\pi_j).
+\end{equation}
+Only after all waves arrive does it update on the pooled buffer:
+\begin{equation}
+ \pi_{j+1}=\arg\min_\pi
+ \sum_{x\in\mathcal{B}_j}
+ \ell\!\left(\pi(\cdot\mid s_x),\hat a_x\right).
+\end{equation}
+\paragraph{Why it targets confirmation bias.}
+Within a window, an early wrong update cannot change later trajectories because
+there is no within-window update.  The loop gain of
+error$\rightarrow$parameter$\rightarrow$data is therefore reduced from every
+wave to once per window.
+
+\paragraph{Why it targets pattern loss.}
+Common and rare waves are co-present in the same optimization event.  Their
+gradients compete jointly instead of the final dominant wave overwriting all
+earlier waves.  This is different from replay: replay repairs a sequential
+update after it occurs and may repeatedly replay corrupted pseudo-labels.
+
+\section{Experimental Setup}
+\label{sec:experiments}
+
+\subsection{Dataset and environment}
+
+We generate 24 procedural workflow patterns organized into 12 confusable
+common/rare pairs.  Pair members have highly similar observation cues but
+disagree on half of their hidden action programs.  Each observation includes
+the workflow cue, current progress, previous tool call, and success/failure
+feedback.  Later cycles oversample common patterns, creating a realistic
+dominant-trajectory stream without deleting minority patterns.
+
+The main setting uses $H=8$, three attempts per stage, six waves, 12 evolution
+cycles, and five seeds.  The scale setting uses $H=16$, 24 evolution cycles,
+and three seeds.  Every method starts from the same warm-start policy and sees
+the same schedule.  Results report mean and sample standard deviation.
+
+\subsection{Comparison methods}
+
+\begin{itemize}[leftmargin=1.4em,itemsep=2pt]
+\item \textbf{Frozen}: no parameter updates.
+\item \textbf{Eager self-distillation}: update after every wave.
+\item \textbf{Confidence-filtered eager}: retain pseudo-labels above a fixed
+confidence threshold, following pseudo-label selection defenses
+\citep{radhakrishnan2023enhancing,rodemann2023bayes}.
+\item \textbf{Mean Teacher}: use an exponential moving-average teacher
+\citep{tarvainen2017mean}.
+\item \textbf{Eager + replay}: mix each current wave with historical
+trajectories, following continual-learning replay
+\citep{yoo2024lpr} and growing-batch ReST \citep{gulcehre2023rest}.
+\item \textbf{Lazy}: freeze collection for six waves and then
+update on all collected pseudo-labels.
+\end{itemize}
+
+These implementations isolate the papers' relevant mechanisms; they are not
+claimed as exact reproductions on the original datasets.
+
+\section{Preliminary Results}
+\label{sec:results}
+
+\subsection{Does the long self-evolution failure exist?}
+
+Table~\ref{tab:main} first establishes the phenomenon.  Eager
+self-distillation collapses from a nonzero frozen policy to zero full-episode
+success.  Its pseudo-label error reaches $94.4\%$ on average, and nearly every
+wrong greedy action becomes its own target.  Its pseudo-action entropy also
+falls, consistent with mode collapse rather than uniformly hard tasks.
+
+\begin{table}[t]
+\centering
+\scriptsize
+\caption{Eight-step, 12-cycle results over five seeds (mean $\pm$ s.d.).
+Arrows indicate the preferred direction.}
+\label{tab:main}
+\begin{tabular}{lYYYY}
+\toprule
+Method & Success $\uparrow$ & Pseudo error $\downarrow$ &
+Self-reinforce $\downarrow$ & Pattern loss $\downarrow$\\
+\midrule
+Frozen & $35.8\pm5.9$ & $46.4\pm7.1$ & $44.9\pm7.2$ & $0.0\pm0.0$\\
+Eager & $0.0\pm0.0$ & $94.4\pm1.2$ & $94.3\pm1.2$ & $39.6\pm9.7$\\
+Confident eager & $54.0\pm30.2$ & $56.8\pm17.2$ & $56.5\pm17.2$ & $26.8\pm14.4$\\
+Mean Teacher & $62.8\pm12.9$ & $49.0\pm8.1$ & $48.2\pm8.2$ & $24.3\pm9.3$\\
+Eager + replay & $56.6\pm9.3$ & $60.4\pm8.1$ & $60.2\pm8.1$ & $10.5\pm2.6$\\
+Lazy (timing) & $\mathbf{74.0\pm17.8}$ & $\mathbf{43.2\pm12.5}$ &
+$\mathbf{43.0\pm12.5}$ & $\mathbf{3.6\pm3.1}$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Probing whether lazy learning addresses both failures}
+
+The comparison separates three partial defenses.  Confidence filtering is
+high-variance because the evolving policy can become confidently wrong.  Mean
+Teacher stabilizes targets but still performs sequential non-IID updates.
+Replay sharply reduces pattern loss but retains high pseudo-label error because
+old incorrect targets are replayed.  Lazy timing is the only updating method in
+Table~\ref{tab:main} with both the lowest error feedback and near-zero pattern
+loss.  A separate probe found that naively adding a confidence gate to Lazy can
+hurt at the longest horizon because the evolving policy becomes confidently
+wrong.  This negative result strengthens the timing interpretation: confidence
+selection is not a substitute for breaking the recursive update loop.
+
+\subsection{Scale with horizon and evolution depth}
+
+The decisive scale experiment increases both axes that generate the recursive
+failure: horizon from 8 to 16 and evolution cycles from 12 to 24.  The final
+three-seed values are shown in Table~\ref{tab:scale}.
+
+\begin{table}[t]
+\centering
+\scriptsize
+\caption{Sixteen-step, 24-cycle long-horizon scale experiment.}
+\label{tab:scale}
+\begin{tabular}{lYYYY}
+\toprule
+Method & Success $\uparrow$ & Pseudo error $\downarrow$ &
+Self-reinforce $\downarrow$ & Pattern loss $\downarrow$\\
+\midrule
+Frozen & $52.9\pm3.5$ & $24.0\pm3.5$ & $21.9\pm3.5$ & $0.0\pm0.0$\\
+Eager & $0.0\pm0.0$ & $95.3\pm2.5$ & $95.2\pm2.6$ & $19.6\pm8.6$\\
+Confident eager & $0.0\pm0.0$ & $93.6\pm1.7$ & $93.5\pm1.7$ & $12.2\pm3.9$\\
+Mean Teacher & $79.1\pm9.6$ & $30.3\pm9.1$ & $29.8\pm9.1$ & $11.3\pm4.4$\\
+Eager + replay & $24.3\pm4.0$ & $69.4\pm1.6$ & $69.3\pm1.6$ & $10.9\pm7.6$\\
+Lazy & $\mathbf{79.6\pm0.8}$ & $\mathbf{29.9\pm2.9}$ &
+$\mathbf{29.8\pm2.9}$ & $\mathbf{6.4\pm4.9}$\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Limitations and Next Steps}
+
+This is a procedural stress test with a lightweight policy and a simulator
+oracle.  It is designed for causal probing, not external validity.  The
+hyperparameter regime was calibrated on one seed before multi-seed evaluation.
+The replay baseline receives additional historical examples, so it is
+data-reuse matched rather than optimizer-step matched.  Our next experiment
+should preserve the same frozen-window intervention in ALFWorld, WebShop, or a
+comparable language-agent environment.
+
+\section{Conclusion}
+
+Long-horizon self-evolution turns ordinary pseudo-label noise into a dynamical
+system: the learner changes the data that will supervise its next version.
+Preliminary results show that eager updates can simultaneously amplify wrong
+actions and erase old workflows.  Lazy collection attacks the causal link
+responsible for the first failure and pooled optimization attacks the sequential
+overwrite responsible for the second.  Naive confidence gating is not
+sufficient when confidence itself is corrupted.
+
+\bibliographystyle{plainnat}
+\bibliography{lazy_distillation}
+\end{document}
